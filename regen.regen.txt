@@ -1,0 +1,198 @@
+// This is the language file to generate the parser for Regen-Lang itself
+"";
+// Token Types
+
+// Define Tokenizer
+extract token Comment;
+token Keyword;
+token Identifier;
+token RegExp;
+token Literal;
+token Symbol;
+// Ignore whitespaces
+ignore /\s+/;
+
+// Comment
+Comment /\/\/[^\n]*\n?/;
+Comment /\/\*([^\*]|(\*[^\/]))*\*\//;
+
+// Literal and RegExp, which are surrounded by either "" or //
+Literal /"((\\.)|[^\\"])*"/;
+RegExp /\/((\\.)|[^\\\/])*\//;
+
+// Keywords
+// Tokenizer
+Keyword "ignore";
+Keyword "extract";
+Keyword "token";
+// Parser
+Keyword "semantic";
+Keyword "rule";
+Keyword "optional";
+
+// Special Symbols
+Symbol /[{};|()=,:\.\[\]]/;
+
+// Identifier is alphanumeric and underscore, but does not start with digit
+Identifier /[_a-zA-Z]\w*/;
+
+
+
+// Define Parser
+
+// Semantics
+semantic Variable; // Identifier as variable name
+semantic Token; // Identifier as token type (note: token types are also semantic types)
+semantic Semantic;
+semantic Rule; // Identifier as rule name
+semantic HookName;
+semantic HookType;
+
+// Rust: use <module name>::Name;
+// Python: from <module name> import Name
+// TypeScript: import { Name } from "<module name>";
+
+// Rules
+
+//rule Target(first: TopLevelStatement, rest: optional Target) first | rest;
+
+rule TopLevelStatement = DefineRuleStatement | TopLevelDefineStatement;
+
+rule ("parse_rule":"Rule")
+DefineRuleStatement(
+    _: token Keyword"rule",
+    hookAttr: optional HookAttrribute,
+    (Rule) ruleName: token Identifier,
+    body: RuleDefineBody
+) {
+    hookAttr, ruleName, body
+};
+
+rule ("parse_hook":"Hook")
+HookAttrribute(
+    _: token Symbol"(",
+    (HookName) hookName: token Literal,
+    _: token Symbol":",
+    (HookType) hookType: token Literal,
+    _: token Symbol")"
+) {
+    hookName, hookType
+};
+
+rule ("parse_rule_value":"RuleValue")
+RuleDefineBody = UnionRuleBody | FunctionalRuleBody;
+
+rule UnionRuleBody(
+    _: token Symbol"=",
+    rules: optional UnionRuleList,
+    _: token Symbol";"
+) rules;
+
+rule UnionRuleList((Rule) first: token Identifier, rest: optional UnionRuleListTail) first | rest;
+rule UnionRuleListTail(
+    _: token Symbol"|",
+    (Rule) first: token Identifier,
+    rest: optional UnionRuleListTail
+) first | rest;
+
+rule A(a: B, b: optional A1) a | b;
+rule B(t:token Literal) t;
+rule A1(t: A2) t;
+rule A2(a: B, b: optional A1) a | b;
+
+rule FunctionalRuleBody(
+    _: token Symbol"(",
+    params: optional ParamList,
+    _: token Symbol")",
+    body: optional Expression,
+    _: token Symbol";"
+) {
+    params, body
+};
+
+
+rule ("parse_param_list":"Vec<Param>") ParamList(first: Param, rest: optional ParamListTail) first | rest;
+rule ParamListTail(_: token Symbol",", first: Param, rest: optional ParamListTail) first | rest;
+
+rule ("parse_param":"Param") Param(
+    semAttr: optional ParamSemantic,
+    (Variable) variable: token Identifier,
+    _: token Symbol":",
+    type: optional RuleType
+) {
+    semAttr, variable, type
+};
+
+rule ParamSemantic(
+    _: token Symbol"(",
+    (Semantic) semanticName: optional token Identifier,
+    _: token Symbol")"
+) semanticName;
+
+rule RuleType(
+    kwOptional: optional token Keyword"optional",
+    kwToken: optional token Keyword"token",
+    id: token Identifier,
+    tokenContent: optional token Literal
+) {
+    kwOptional, kwToken, id, tokenContent
+};
+
+rule TopLevelDefineStatement(body: TopLevelDefine, _: token Symbol";") body;
+
+rule TopLevelDefine = 
+  TokenLiteral
+  | DefineTokenTypeStatement
+  | DefineIgnoreTokenRuleStatement
+  | DefineTokenRuleStatement
+  | DefineSemanticStatement;
+
+rule ("parse_token_def":"TokenDef") DefineTokenTypeStatement(
+    kwExtract: optional token Keyword"extract",
+    _: token Keyword"token",
+    (Token) tokenType: token Identifier
+) {
+    kwExtract, tokenType
+};
+
+rule ("parse_token_ignore_rule":"TokenRule")
+DefineIgnoreTokenRuleStatement(_: token Keyword"ignore", value: LiteralOrRegExp) value;
+
+rule ("parse_token_rule":"TokenRule") DefineTokenRuleStatement((Token) tokenType: token Identifier, value: LiteralOrRegExp) {
+    tokenType, value
+};
+
+rule LiteralOrRegExp = TokenLiteral | TokenRegExp;
+rule TokenLiteral(t: token Literal) t;
+rule TokenRegExp(t: token RegExp) t;
+
+rule ("parse_semantic":"String") DefineSemanticStatement(_: token Keyword"semantic", (Semantic) id: token Identifier) id;
+
+rule ("parse_expr":"Expr") Expression = ConcatExpression | DictExpression;
+
+rule ConcatExpression(
+    (Variable) first: token Identifier,
+    rest: optional ConcatExpressionTail
+) first | rest;
+rule ConcatExpressionTail(
+    _: token Symbol"|",
+    rest: ConcatExpression
+) rest;
+
+rule DictExpression(
+    _: token Symbol"{",
+    values: optional VariableList,
+    _: token Symbol"}"
+) values;
+
+// VariableList is at least one variable.
+rule VariableList((Variable) first: token Identifier, rest: optional VariableListTail) first | rest;
+rule VariableListTail(_: token Symbol",", rest: optional VariableList) rest;
+
+// ExpressionList is at least one expression.
+// rule ExpressionList(first: Expression, rest: optional ExpressionListTail) first | rest;
+// rule ExpressionListTail(_: token Symbol",", rest: optional ExpressionList) rest;
+
+// LiteralList is at least one literal.
+// rule LiteralList(first: token Literal, rest: optional LiteralListTail) first | rest;
+// rule LiteralListTail(_: token Symbol",", rest: LiteralList) rest;
