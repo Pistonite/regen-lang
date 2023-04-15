@@ -7,8 +7,10 @@ pub mod semantic;
 pub mod lang;
 pub mod eval;
 
-use rule::{ParamType, RetType};
+use rule::{ParamType, RetType, RetType2, RuleValue, Rule, rule};
 use param::{param, Param};
+use hook::{hook, Hook};
+use expr::{expr, Expr};
 
 use std::collections::{HashMap, HashSet};
 
@@ -40,196 +42,167 @@ struct TokenRule {
 
 
 
+// enum RuleValue {
+//     Union(Vec<String>),
+//     Function(Vec<Param>, Expr),
+// }
 
-enum Expr {
-    Concat(Vec<String>),
-    Var(String /* identifier */),
-    Dict(Vec<String>),
-}
 
-impl Expr {
-    fn get_vars(&self) -> Vec<String> {
-        match self {
-            Expr::Concat(vars) => vars.clone(),
-            Expr::Var(identifier) => vec![identifier.clone()],
-            Expr::Dict(vars) => vars.clone()
-        }
-    }
-}
+// struct rule {
+//     identifier: String,
+//     hook: Option<Hook>,
+//     value: RuleValue,
+// }
 
-enum RuleValue {
-    Union(Vec<String>),
-    Function(Vec<Param>, Expr),
-}
-
-struct HookDef {
-    name: String,
-    return_type: String,
-}
-
-macro_rules! hookdef {
-    ($name:ident $type:literal) => {
-        HookDef {
-            name: stringify!($name).to_string(),
-            return_type: $type.to_string(),
-        }
-    };
-}
-
-struct RuleDef {
-    identifier: String,
-    hook: Option<HookDef>,
-    value: RuleValue,
-}
-
-impl RuleDef {
-    /// Internal AST type name
-    fn ast_type(&self) -> String {
-        format!("AST{}", to_camel_case(&self.identifier, true))
-    }
-    /// External Parse Tree node type.
-    /// If the rule has a hook, this will be the return type of the hook
-    fn pt_type(&self) -> String {
-        match &self.hook {
-            Some(hook) => format!("ParseHook<{}, {}>", hook.return_type, &self.pt_internal_type(true)),
-            None =>self.pt_internal_type(true)
-        }
-    }
-    /// The internal Parse Tree node type.
-    /// If the rule has a hook, this will be the type passed to the hook
-    fn pt_internal_type(&self, include_lifetime: bool) -> String {
-        let mut t = format!("PT{}", to_camel_case(&self.identifier, true));
-        if include_lifetime {
-            t.push_str("<'p>")
-        }
-        t
-    }
-    /// Recursively resolve the return type of a rule
-    fn resolve_ret_type(&self, ret_types: &mut HashMap<String, RetType>, rules: &HashMap<String, &RuleDef>) {
-        if ret_types.contains_key(&self.identifier) {
-            // Already resolved or is resolving
-            return;
-        }
+// impl rule {
+//     /// Internal AST type name
+//     fn ast_type(&self) -> String {
+//         format!("AST{}", to_camel_case(&self.identifier, true))
+//     }
+//     /// External Parse Tree node type.
+//     /// If the rule has a hook, this will be the return type of the hook
+//     fn pt_type(&self) -> String {
+//         match &self.hook {
+//             Some(hook) => format!("ParseHook<{}, {}>", hook.return_type, &self.pt_internal_type(true)),
+//             None =>self.pt_internal_type(true)
+//         }
+//     }
+//     /// The internal Parse Tree node type.
+//     /// If the rule has a hook, this will be the type passed to the hook
+//     fn pt_internal_type(&self, include_lifetime: bool) -> String {
+//         let mut t = format!("PT{}", to_camel_case(&self.identifier, true));
+//         if include_lifetime {
+//             t.push_str("<'p>")
+//         }
+//         t
+//     }
+//     /// Recursively resolve the return type of a rule
+//     fn resolve_ret_type(&self, ret_types: &mut HashMap<String, RetType>, rules: &HashMap<String, &rule>) {
+//         if ret_types.contains_key(&self.identifier) {
+//             // Already resolved or is resolving
+//             return;
+//         }
         
-        match &self.value {
-            RuleValue::Union(_) => {
-                ret_types.insert(self.identifier.clone(), RetType::Struct);
-            }
-            RuleValue::Function(params, body) => {
-                let mut param_types = HashMap::new();
-                for param in params {
-                    if let Some(t) = param.get_type() {
-                        param_types.insert(param.name.clone(), t);
-                    }
-                }
-                match body {
-                    Expr::Concat(vars) => {
-                        // First update the return type to be a vector of first variable
-                        let first_var = vars.first().unwrap();
-                        let first_var_type = param_types.get(first_var).unwrap();
-                        let self_type = RetType::Vec(first_var_type.clone());
-                        ret_types.insert(self.identifier.clone(), self_type.clone());
-                        // If the first variable is a subrule, resolve it
-                        if let ParamType::Item(_, t) = first_var_type {
-                            // It cannot be recursive, otherwise we would have vectors of infinite depth
-                            if t == &self.identifier {
-                                ret_types.insert(
-                                    self.identifier.clone(),
-                                    RetType::Unresolved(format!("Cannot resolve return type of {id}: {id} is recursive as the first value in concatenation", id = &self.identifier))
-                                );
-                                return;
-                            }
-                            let rule = rules.get(t).unwrap();
-                            rule.resolve_ret_type(ret_types, rules);
-                        }
+//         match &self.value {
+//             RuleValue::Union(_) => {
+//                 ret_types.insert(self.identifier.clone(), RetType::Struct);
+//             }
+//             RuleValue::Function(params, body) => {
+//                 let mut param_types = HashMap::new();
+//                 for param in params {
+//                     if let Some(t) = param.get_type() {
+//                         param_types.insert(param.name.clone(), t);
+//                     }
+//                 }
+//                 match body {
+//                     Expr::Concat(vars) => {
+//                         // First update the return type to be a vector of first variable
+//                         let first_var = vars.first().unwrap();
+//                         let first_var_type = param_types.get(first_var).unwrap();
+//                         let self_type = RetType::Vec(first_var_type.clone());
+//                         ret_types.insert(self.identifier.clone(), self_type.clone());
+//                         // If the first variable is a subrule, resolve it
+//                         if let ParamType::Item(_, t) = first_var_type {
+//                             // It cannot be recursive, otherwise we would have vectors of infinite depth
+//                             if t == &self.identifier {
+//                                 ret_types.insert(
+//                                     self.identifier.clone(),
+//                                     RetType::Unresolved(format!("Cannot resolve return type of {id}: {id} is recursive as the first value in concatenation", id = &self.identifier))
+//                                 );
+//                                 return;
+//                             }
+//                             let rule = rules.get(t).unwrap();
+//                             rule.resolve_ret_type(ret_types, rules);
+//                         }
                         
 
-                        // make sure the last is a vector of the same type
-                        let last_var = vars.last().unwrap();
-                        let last_var_type = param_types.get(last_var).unwrap();
-                        if let ParamType::Item(_, t) = last_var_type {
-                            let rule = rules.get(t).unwrap();
-                            rule.resolve_ret_type(ret_types, rules);
-                            match ret_types.get(t).unwrap() {
-                                RetType::Vec(t) => {
-                                    if t != first_var_type {
+//                         // make sure the last is a vector of the same type
+//                         let last_var = vars.last().unwrap();
+//                         let last_var_type = param_types.get(last_var).unwrap();
+//                         if let ParamType::Item(_, t) = last_var_type {
+//                             let rule = rules.get(t).unwrap();
+//                             rule.resolve_ret_type(ret_types, rules);
+//                             match ret_types.get(t).unwrap() {
+//                                 RetType::Vec(t) => {
+//                                     if t != first_var_type {
                                         
-                                        ret_types.insert(
-                                            self.identifier.clone(),
-                                            RetType::Unresolved(format!("Cannot resolve return type of {id}: Last in concate expression must be a vector of the same type as the rest of the items", id = &self.identifier))
-                                        );
-                                        return;
-                                    }
-                                }
-                                RetType::Param(ParamType::Item(_, t)) => {
-                                    let last_type = ret_types.get(t).unwrap();
-                                    if last_type != &self_type {
-                                        ret_types.insert(
-                                            self.identifier.clone(),
-                                            RetType::Unresolved(format!("Cannot resolve return type of {id}: {t} does not have a vector return type", id = &self.identifier))
-                                        );
-                                        return;
-                                    }
+//                                         ret_types.insert(
+//                                             self.identifier.clone(),
+//                                             RetType::Unresolved(format!("Cannot resolve return type of {id}: Last in concate expression must be a vector of the same type as the rest of the items", id = &self.identifier))
+//                                         );
+//                                         return;
+//                                     }
+//                                 }
+//                                 RetType::Param(ParamType::Item(_, t)) => {
+//                                     let last_type = ret_types.get(t).unwrap();
+//                                     if last_type != &self_type {
+//                                         ret_types.insert(
+//                                             self.identifier.clone(),
+//                                             RetType::Unresolved(format!("Cannot resolve return type of {id}: {t} does not have a vector return type", id = &self.identifier))
+//                                         );
+//                                         return;
+//                                     }
                                     
-                                }
-                                _ => {
+//                                 }
+//                                 _ => {
                                     
-                                    ret_types.insert(
-                                        self.identifier.clone(),
-                                        RetType::Unresolved(format!("Cannot resolve return type of {id}: Last in concate expression must be a vector", id = &self.identifier))
-                                    );
-                                    return;
-                                }
-                            }
-                        } else {
-                            // Only subrules can be a vector, so last is not a vector, fail.
-                            ret_types.insert(
-                                self.identifier.clone(),
-                                RetType::Unresolved(format!("Cannot resolve return type of {id}: Last in concate expression must be a vector", id = &self.identifier))
-                            );
-                            return;
-                        }
+//                                     ret_types.insert(
+//                                         self.identifier.clone(),
+//                                         RetType::Unresolved(format!("Cannot resolve return type of {id}: Last in concate expression must be a vector", id = &self.identifier))
+//                                     );
+//                                     return;
+//                                 }
+//                             }
+//                         } else {
+//                             // Only subrules can be a vector, so last is not a vector, fail.
+//                             ret_types.insert(
+//                                 self.identifier.clone(),
+//                                 RetType::Unresolved(format!("Cannot resolve return type of {id}: Last in concate expression must be a vector", id = &self.identifier))
+//                             );
+//                             return;
+//                         }
                         
-                        // Make sure the middle are the same as the first
-                        for var in vars.iter().skip(1).take(vars.len() - 2) {
-                            let var_type = param_types.get(var).unwrap();
-                            if var_type != first_var_type {
-                                ret_types.insert(
-                                    self.identifier.clone(),
-                                    RetType::Unresolved(format!("Cannot resolve return type of {id}: All except last items in concate expression must be the same type", id = &self.identifier))
-                                );
-                                return;
-                            }
-                        }
-                    }
-                    Expr::Var(name) => {
-                        let param_type = param_types.get(name).unwrap();
-                        let self_type = RetType::Param(param_type.clone());
-                        ret_types.insert(self.identifier.clone(), self_type);
-                    },
-                    Expr::Dict(vars) => {
-                        ret_types.insert(self.identifier.clone(), RetType::Struct);
-                        for var in vars {
-                            let param_type = param_types.get(var).unwrap();
-                            if let ParamType::Item(_, t) = param_type {
-                                let rule = rules.get(t).unwrap();
-                                rule.resolve_ret_type(ret_types, rules);
-                            }
-                        }
-                    }
-                }
-            }
+//                         // Make sure the middle are the same as the first
+//                         for var in vars.iter().skip(1).take(vars.len() - 2) {
+//                             let var_type = param_types.get(var).unwrap();
+//                             if var_type != first_var_type {
+//                                 ret_types.insert(
+//                                     self.identifier.clone(),
+//                                     RetType::Unresolved(format!("Cannot resolve return type of {id}: All except last items in concate expression must be the same type", id = &self.identifier))
+//                                 );
+//                                 return;
+//                             }
+//                         }
+//                     }
+//                     Expr::Var(name) => {
+//                         let param_type = param_types.get(name).unwrap();
+//                         let self_type = RetType::Param(param_type.clone());
+//                         ret_types.insert(self.identifier.clone(), self_type);
+//                     },
+//                     Expr::Dict(vars) => {
+//                         ret_types.insert(self.identifier.clone(), RetType::Struct);
+//                         for var in vars {
+//                             let param_type = param_types.get(var).unwrap();
+//                             if let ParamType::Item(_, t) = param_type {
+//                                 let rule = rules.get(t).unwrap();
+//                                 rule.resolve_ret_type(ret_types, rules);
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
 
-        }
-    }
-}
+//         }
+//     }
+// }
 
 /// The main language definition
 pub struct LangDef {
+    target: String,
     tokens: Vec<TokenDef>,
     token_rules: Vec<TokenRule>,
     semantics: Vec<String>,
-    rules: Vec<RuleDef>,
+    rules: HashMap<String, Rule>,
 }
 
 // convienient macros for testing
@@ -265,332 +238,314 @@ fn to_camel_case(s: &str, upper: bool) -> String {
 }
 
 
-macro_rules! ruledef {
-    ($identifier:literal, $value:expr) => {
-        RuleDef {
-            identifier: $identifier.to_string(),
-            hook: None,
-            value: $value,
-        }
-    };
-    ($identifier:literal, $value:expr, $hook:expr) => {
-        RuleDef {
-            identifier: $identifier.to_string(),
-            hook: Some($hook),
-            value: $value,
-        }
-    };
-}
 
-macro_rules! expr {
-    ($( $t:literal)|* ) => {
-        Expr::Concat(vec![ $( $t.to_string() ),*])
-    };
-    ($( $t:literal),* ) => {
-        Expr::Dict(vec![ $( $t.to_string() ),*])
-    };
-
-}
 
 impl LangDef {
     pub fn make_test() -> Self {
+        let rules = vec![
+            // rule!(
+            //     "Target",
+            //     RuleValue::Function(
+            //         vec![
+            //             param!("first": "TopLevelStatement"),
+            //             param!("rest": optional "Target"),
+            //         ],
+            //         expr!["first" | "rest"]
+            //     )
+            // ),
+            rule!(
+                "TopLevelStatement",
+                RuleValue::Union(vec![
+                    "DefineRuleStatement".to_string(),
+                    "TopLevelDefineStatement".to_string(),
+                ])
+            ),
+            rule!(
+                "DefineRuleStatement",
+                RuleValue::Function(
+                    vec![
+                        param!("_": token "Keyword" "rule"),
+                        param!("hookAttr": optional "HookAttribute"),
+                        param!(("Rule") "ruleName": token "Identifier"),
+                        param!("body": "ruleineBody"),
+                    ],
+                    expr!{hookAttr, ruleName, body}
+                ),
+                hook!("parse_rule" : "Rule")
+            ),
+            rule!(
+                "HookAttribute",
+                RuleValue::Function(
+                    vec![
+                        param!("_": token "Symbol" "("),
+                        param!(("HookName") "hookName": token "Literal"),
+                        param!("_": token "Symbol" ":"),
+                        param!(("HookType") "hookType": token "Literal"),
+                        param!("_": token "Symbol" ")"),
+                    ],
+                    expr!{hookName, hookType}
+                ),
+                hook!("parse_hook" : "Hook")
+
+            ),
+            rule!(
+                "ruleineBody",
+                RuleValue::Union(vec![
+                    "UnionRuleBody".to_string(),
+                    "FunctionalRuleBody".to_string(),
+                ]),
+                hook!("parse_rule_value" : "RuleValue")
+
+            ),
+            rule!(
+                "UnionRuleBody",
+                RuleValue::Function(
+                    vec![
+                        param!("_": token "Symbol" "="),
+                        param!("rules": optional "UnionRuleList"),
+                        param!("_": token "Symbol" ";"),
+                    ],
+                    Expr::Var("rules".to_string())
+                )
+            ),
+            rule!(
+                "UnionRuleList",
+                RuleValue::Function(
+                    vec![
+                        param!(("Rule") "first": token "Identifier"),
+                        param!("rest": optional "UnionRuleListTail"),
+                    ],
+                    expr!(first | rest)
+                )
+            ),
+            rule!(
+                "UnionRuleListTail",
+                RuleValue::Function(
+                    vec![
+                        param!("_": token "Symbol" "|"),
+                        param!(("Rule") "first": token "Identifier"),
+                        param!("rest": optional "UnionRuleListTail"),
+                    ],
+                    expr!(first | rest)
+                )
+            ),
+            rule!(
+                "FunctionalRuleBody",
+                RuleValue::Function(
+                    vec![
+                        param!("_": token "Symbol" "("),
+                        param!("params": optional "ParamList"),
+                        param!("_": token "Symbol" ")"),
+                        param!("body": optional "Expression"),
+                        param!("_": token "Symbol" ";"),
+                    ],
+                    expr!(params , body)
+                )
+            ),
+            rule!(
+                "ParamList",
+                RuleValue::Function(
+                    vec![
+                        param!("first": "Param"),
+                        param!("rest": optional "ParamListTail"),
+                    ],
+                    expr!(first | rest)
+                ),
+                hook!("parse_param_list" : "Vec<Param>")
+            ),
+            rule!(
+                "ParamListTail",
+                RuleValue::Function(
+                    vec![
+                        param!("_": token "Symbol" ","),
+                        param!("first": "Param"),
+                        param!("rest": optional "ParamListTail"),
+                    ],
+                    expr!(first | rest)
+                )
+            ),
+            rule!(
+                "Param",
+                RuleValue::Function(
+                    vec![
+                        param!("semAttr": optional "ParamSemantic"),
+                        param!(("Variable") "variable": token "Identifier"),
+                        param!("_": token "Symbol" ":"),
+                        param!("type": optional "RuleType"),
+                    ],
+                    expr!{semAttr, variable, type}
+                ),
+                hook!("parse_param" : "Param")
+            ),
+            rule!(
+                "ParamSemantic",
+                RuleValue::Function(
+                    vec![
+                        param!("_": token "Symbol" "("),
+                        param!(("Semantic") "semanticName": optional token "Identifier"),
+                        param!("_": token "Symbol" ")"),
+                    ],
+                    Expr::Var("semanticName".to_string())
+                )
+            ),
+            rule!(
+                "RuleType",
+                RuleValue::Function(
+                    vec![
+                        param!("kwOptional": optional token "Keyword" "optional"),
+                        param!("kwToken": optional token "Keyword" "token"),
+                        param!("id": token "Identifier"),
+                        param!("tokenContent": optional token "Literal"),
+                    ],
+                   expr!{kwOptional, kwToken, id, tokenContent}
+                )
+            ),
+            rule!(
+                "TopLevelDefineStatement",
+                RuleValue::Function(
+                    vec![
+                        param!("body": "TopLevelDefine"),
+                        param!("_": token "Symbol" ";"),
+                    ],
+                    Expr::Var("body".to_string())
+                )
+            ),
+            rule!(
+                "TopLevelDefine",
+                RuleValue::Union(vec![
+                    "TokenLiteral".to_string(),
+                    "DefineTokenTypeStatement".to_string(),
+                    "DefineIgnoreTokenRuleStatement".to_string(),
+                    "DefineTokenRuleStatement".to_string(),
+                    "DefineSemanticStatement".to_string(),
+                ])
+            ),
+            rule!(
+                "DefineTokenTypeStatement",
+                RuleValue::Function(
+                    vec![
+                        param!("kwExtract": optional token "Keyword" "extract"),
+                        param!("_": token "Keyword" "token"),
+                        param!(("Token") "tokenType": token "Identifier"),
+                    ],
+                    expr!{kwExtract, tokenType}
+                ),
+                hook!("parse_token_def" : "TokenDef")
+            ),
+            rule!(
+                "DefineIgnoreTokenRuleStatement",
+                RuleValue::Function(
+                    vec![
+                        param!("_": token "Keyword" "ignore"),
+                        param!("value": "LiteralOrRegExp"),
+                    ],
+                    Expr::Var("value".to_string())
+                ),
+                hook!("parse_token_ignore_rule" : "TokenRule")
+            ),
+            rule!(
+                "DefineTokenRuleStatement",
+                RuleValue::Function(
+                    vec![
+                        param!(("Token") "tokenType": token "Identifier"),
+                        param!("value": "LiteralOrRegExp"),
+                    ],
+                    expr!{tokenType, value}
+                ),
+                hook!("parse_token_rule": "TokenRule")
+            ),
+            rule!(
+                "LiteralOrRegExp",
+                RuleValue::Union(vec!["TokenLiteral".to_string(), "TokenRegExp".to_string(),])
+            ),
+            rule!(
+                "TokenLiteral",
+                RuleValue::Function(vec![param!("t": token "Literal"),], Expr::Var("t".to_string()))
+            ),
+            rule!(
+                "TokenRegExp",
+                RuleValue::Function(vec![param!("t": token "RegExp"),], Expr::Var("t".to_string()))
+            ),
+            rule!(
+                "DefineSemanticStatement",
+                RuleValue::Function(
+                    vec![
+                        param!("_": token "Keyword" "semantic"),
+                        param!(("Semantic") "id": token "Identifier"),
+                    ],
+                    Expr::Var("id".to_string())
+                ),
+                hook!("parse_semantic": "String")
+
+            ),
+            rule!(
+                "Expression",
+                RuleValue::Union(vec![
+                    "ConcatExpression".to_string(),
+                    "DictExpression".to_string(),
+                ]),
+                hook!("parse_expr": "Expr")
+            ),
+            rule!(
+                "ConcatExpression",
+                RuleValue::Function(
+                    vec![
+                        param!(("Variable") "first": token "Identifier"),
+                        param!("rest": optional "ConcatExpressionTail"),
+                    ],
+                    expr!(first | rest)
+                )
+            ),
+            rule!(
+                "ConcatExpressionTail",
+                RuleValue::Function(
+                    vec![
+                        param!("_": token "Symbol" "|"),
+                        param!("rest": "ConcatExpression"),
+                    ],
+                    Expr::Var("rest".to_string())
+                )
+            ),
+            rule!(
+                "DictExpression",
+                RuleValue::Function(
+                    vec![
+                        param!("_": token "Symbol" "{"),
+                        param!("values": optional "VariableList"),
+                        param!("_": token "Symbol" "}"),
+                    ],
+                    Expr::Var("values".to_string())
+                )
+            ),
+            rule!(
+                "VariableList",
+                RuleValue::Function(
+                    vec![
+                        param!(("Variable") "first": token "Identifier"),
+                        param!("rest": optional "VariableListTail"),
+                    ],
+                    expr!(first | rest)
+                )
+            ),
+            rule!(
+                "VariableListTail",
+                RuleValue::Function(
+                    vec![
+                        param!("_": token "Symbol" ","),
+                        param!("rest": optional "VariableList"),
+                    ],
+                    Expr::Var("rest".to_string())
+                )
+            ),
+        ];
+        let target = rules.first().unwrap().name.clone();
+        let rule_map = rules
+            .into_iter()
+            .map(|r| (r.name.clone(), r))
+            .collect();
         LangDef {
-            rules: vec![
-                // ruledef!(
-                //     "Target",
-                //     RuleValue::Function(
-                //         vec![
-                //             param!("first": "TopLevelStatement"),
-                //             param!("rest": optional "Target"),
-                //         ],
-                //         expr!["first" | "rest"]
-                //     )
-                // ),
-                ruledef!(
-                    "TopLevelStatement",
-                    RuleValue::Union(vec![
-                        "DefineRuleStatement".to_string(),
-                        "TopLevelDefineStatement".to_string(),
-                    ])
-                ),
-                ruledef!(
-                    "DefineRuleStatement",
-                    RuleValue::Function(
-                        vec![
-                            param!("_": token "Keyword" "rule"),
-                            param!("hookAttr": optional "HookAttribute"),
-                            param!(("Rule") "ruleName": token "Identifier"),
-                            param!("body": "RuleDefineBody"),
-                        ],
-                        expr!("hookAttr", "ruleName", "body")
-                    ),
-                    hookdef!(parse_rule "Rule")
-                ),
-                ruledef!(
-                    "HookAttribute",
-                    RuleValue::Function(
-                        vec![
-                            param!("_": token "Symbol" "("),
-                            param!(("HookName") "hookName": token "Literal"),
-                            param!("_": token "Symbol" ":"),
-                            param!(("HookType") "hookType": token "Literal"),
-                            param!("_": token "Symbol" ")"),
-                        ],
-                        expr!("hookName", "hookType")
-                    ),
-                    hookdef!(parse_hook "Hook")
-
-                ),
-                ruledef!(
-                    "RuleDefineBody",
-                    RuleValue::Union(vec![
-                        "UnionRuleBody".to_string(),
-                        "FunctionalRuleBody".to_string(),
-                    ]),
-                    hookdef!(parse_rule_value "RuleValue")
-
-                ),
-                ruledef!(
-                    "UnionRuleBody",
-                    RuleValue::Function(
-                        vec![
-                            param!("_": token "Symbol" "="),
-                            param!("rules": optional "UnionRuleList"),
-                            param!("_": token "Symbol" ";"),
-                        ],
-                        Expr::Var("rules".to_string())
-                    )
-                ),
-                ruledef!(
-                    "UnionRuleList",
-                    RuleValue::Function(
-                        vec![
-                            param!(("Rule") "first": token "Identifier"),
-                            param!("rest": optional "UnionRuleListTail"),
-                        ],
-                        expr!("first" | "rest")
-                    )
-                ),
-                ruledef!(
-                    "UnionRuleListTail",
-                    RuleValue::Function(
-                        vec![
-                            param!("_": token "Symbol" "|"),
-                            param!(("Rule") "first": token "Identifier"),
-                            param!("rest": optional "UnionRuleListTail"),
-                        ],
-                        expr!("first" | "rest")
-                    )
-                ),
-                ruledef!(
-                    "FunctionalRuleBody",
-                    RuleValue::Function(
-                        vec![
-                            param!("_": token "Symbol" "("),
-                            param!("params": optional "ParamList"),
-                            param!("_": token "Symbol" ")"),
-                            param!("body": optional "Expression"),
-                            param!("_": token "Symbol" ";"),
-                        ],
-                        expr!("params" , "body")
-                    )
-                ),
-                ruledef!(
-                    "ParamList",
-                    RuleValue::Function(
-                        vec![
-                            param!("first": "Param"),
-                            param!("rest": optional "ParamListTail"),
-                        ],
-                        expr!("first" | "rest")
-                    ),
-                    hookdef!(parse_param_list "Vec<Param>")
-                ),
-                ruledef!(
-                    "ParamListTail",
-                    RuleValue::Function(
-                        vec![
-                            param!("_": token "Symbol" ","),
-                            param!("first": "Param"),
-                            param!("rest": optional "ParamListTail"),
-                        ],
-                        expr!("first" | "rest")
-                    )
-                ),
-                ruledef!(
-                    "Param",
-                    RuleValue::Function(
-                        vec![
-                            param!("semAttr": optional "ParamSemantic"),
-                            param!(("Variable") "variable": token "Identifier"),
-                            param!("_": token "Symbol" ":"),
-                            param!("type": optional "RuleType"),
-                        ],
-                        expr!("semAttr", "variable", "type")
-                    ),
-                    hookdef!(parse_param "Param")
-                ),
-                ruledef!(
-                    "ParamSemantic",
-                    RuleValue::Function(
-                        vec![
-                            param!("_": token "Symbol" "("),
-                            param!(("Semantic") "semanticName": optional token "Identifier"),
-                            param!("_": token "Symbol" ")"),
-                        ],
-                        Expr::Var("semanticName".to_string())
-                    )
-                ),
-                ruledef!(
-                    "RuleType",
-                    RuleValue::Function(
-                        vec![
-                            param!("kwOptional": optional token "Keyword" "optional"),
-                            param!("kwToken": optional token "Keyword" "token"),
-                            param!("id": token "Identifier"),
-                            param!("tokenContent": optional token "Literal"),
-                        ],
-                       expr!("kwOptional", "kwToken", "id", "tokenContent")
-                    )
-                ),
-                ruledef!(
-                    "TopLevelDefineStatement",
-                    RuleValue::Function(
-                        vec![
-                            param!("body": "TopLevelDefine"),
-                            param!("_": token "Symbol" ";"),
-                        ],
-                        Expr::Var("body".to_string())
-                    )
-                ),
-                ruledef!(
-                    "TopLevelDefine",
-                    RuleValue::Union(vec![
-                        "TokenLiteral".to_string(),
-                        "DefineTokenTypeStatement".to_string(),
-                        "DefineIgnoreTokenRuleStatement".to_string(),
-                        "DefineTokenRuleStatement".to_string(),
-                        "DefineSemanticStatement".to_string(),
-                    ])
-                ),
-                ruledef!(
-                    "DefineTokenTypeStatement",
-                    RuleValue::Function(
-                        vec![
-                            param!("kwExtract": optional token "Keyword" "extract"),
-                            param!("_": token "Keyword" "token"),
-                            param!(("Token") "tokenType": token "Identifier"),
-                        ],
-                        expr!("kwExtract", "tokenType")
-                    ),
-                    hookdef!(parse_token_def "TokenDef")
-                ),
-                ruledef!(
-                    "DefineIgnoreTokenRuleStatement",
-                    RuleValue::Function(
-                        vec![
-                            param!("_": token "Keyword" "ignore"),
-                            param!("value": "LiteralOrRegExp"),
-                        ],
-                        Expr::Var("value".to_string())
-                    ),
-                    hookdef!(parse_token_ignore_rule "TokenRule")
-                ),
-                ruledef!(
-                    "DefineTokenRuleStatement",
-                    RuleValue::Function(
-                        vec![
-                            param!(("Token") "tokenType": token "Identifier"),
-                            param!("value": "LiteralOrRegExp"),
-                        ],
-                        expr!("tokenType", "value")
-                    ),
-                    hookdef!(parse_token_rule "TokenRule")
-                ),
-                ruledef!(
-                    "LiteralOrRegExp",
-                    RuleValue::Union(vec!["TokenLiteral".to_string(), "TokenRegExp".to_string(),])
-                ),
-                ruledef!(
-                    "TokenLiteral",
-                    RuleValue::Function(vec![param!("t": token "Literal"),], Expr::Var("t".to_string()))
-                ),
-                ruledef!(
-                    "TokenRegExp",
-                    RuleValue::Function(vec![param!("t": token "RegExp"),], Expr::Var("t".to_string()))
-                ),
-                ruledef!(
-                    "DefineSemanticStatement",
-                    RuleValue::Function(
-                        vec![
-                            param!("_": token "Keyword" "semantic"),
-                            param!(("Semantic") "id": token "Identifier"),
-                        ],
-                        Expr::Var("id".to_string())
-                    ),
-                    hookdef!(parse_semantic "String")
-
-                ),
-                ruledef!(
-                    "Expression",
-                    RuleValue::Union(vec![
-                        "ConcatExpression".to_string(),
-                        "DictExpression".to_string(),
-                    ]),
-                    hookdef!(parse_expr "Expr")
-                ),
-                ruledef!(
-                    "ConcatExpression",
-                    RuleValue::Function(
-                        vec![
-                            param!(("Variable") "first": token "Identifier"),
-                            param!("rest": optional "ConcatExpressionTail"),
-                        ],
-                        expr!("first" | "rest")
-                    )
-                ),
-                ruledef!(
-                    "ConcatExpressionTail",
-                    RuleValue::Function(
-                        vec![
-                            param!("_": token "Symbol" "|"),
-                            param!("rest": "ConcatExpression"),
-                        ],
-                        Expr::Var("rest".to_string())
-                    )
-                ),
-                ruledef!(
-                    "DictExpression",
-                    RuleValue::Function(
-                        vec![
-                            param!("_": token "Symbol" "{"),
-                            param!("values": optional "VariableList"),
-                            param!("_": token "Symbol" "}"),
-                        ],
-                        Expr::Var("values".to_string())
-                    )
-                ),
-                ruledef!(
-                    "VariableList",
-                    RuleValue::Function(
-                        vec![
-                            param!(("Variable") "first": token "Identifier"),
-                            param!("rest": optional "VariableListTail"),
-                        ],
-                        expr!("first" | "rest")
-                    )
-                ),
-                ruledef!(
-                    "VariableListTail",
-                    RuleValue::Function(
-                        vec![
-                            param!("_": token "Symbol" ","),
-                            param!("rest": optional "VariableList"),
-                        ],
-                        Expr::Var("rest".to_string())
-                    )
-                ),
-            ],
+            target,
+            rules: rule_map,
             semantics: vec![
                 "Variable".to_string(),
                 "Token".to_string(),
@@ -698,7 +653,7 @@ impl LangDef {
         }
     }
 
-    pub fn emit_rust(&self) {
+    pub fn emit_rust(&mut self) {
         let mut should_extract = HashSet::new();
         for token in &self.tokens {
             if token.is_extract {
@@ -773,7 +728,7 @@ impl LangDef {
 
         // =============================
         // Entry Point
-        let first_target = &self.rules.first().unwrap();
+        let first_target = self.rules.get(&self.target).unwrap();
         println!("regen::generate_api!({}, {}, tokenize_internal);", first_target.pt_internal_type(false), first_target.ast_type());
 
         // =============================
@@ -786,8 +741,8 @@ impl LangDef {
         println!("// =============================");
         println!("// AST");
         let mut ast_type_map = HashMap::new();
-        for r in &self.rules {
-            ast_type_map.insert(r.identifier.clone(), r.ast_type());
+        for (name, r) in &self.rules {
+            ast_type_map.insert(r.name.clone(), r.ast_type());
         }
         
 
@@ -798,77 +753,23 @@ impl LangDef {
         let mut pt_type_map = HashMap::new();
         let mut pt_internal_type_map = HashMap::new();
         let mut ret_type_map = HashMap::new();
-        let mut rule_map = HashMap::new();
         
-        for r in &self.rules {
-            pt_type_map.insert(r.identifier.clone(), r.pt_type());
-            pt_internal_type_map.insert(r.identifier.clone(), r.pt_internal_type(false));
-            rule_map.insert(r.identifier.clone(), r);
+        for (_, r) in &self.rules {
+            pt_type_map.insert(r.name.clone(), r.pt_type());
+            pt_internal_type_map.insert(r.name.clone(), r.pt_internal_type(false));
         }
-        // import hooks
-        // let mut import_map: HashMap<&String, HashSet<&String>> = HashMap::new();
-        // for r in &self.rules {
-        //     if let Some(hook) = &r.hook {
-        //         let module = &hook.module;
-        //         let pt_type = &hook.return_type;
-        //         let func = &hook.name;
-        //         match import_map.get_mut(module) {
-        //             Some(set) => {
-        //                 set.insert(pt_type);
-        //                 set.insert(func);
-        //             }
-        //             None => {
-        //                 let mut set = HashSet::new();
-        //                 set.insert(pt_type);
-        //                 set.insert(func);
-        //                 import_map.insert(module, set);
-        //             }
-        //         }
-        //     }
-        // }
-        // for (module, symbols) in import_map {
-        //     println!("use {module}::{{");
-        //     for s in symbols {
-        //         println!("    {s},");
-        //     }
-        //     println!("}};");
-        // }
+ 
         
-        for r in &self.rules {
-            eprintln!("resolving {}", r.identifier);
-            r.resolve_ret_type(&mut ret_type_map, &rule_map);
+        for (name, r) in &self.rules {
+            eprintln!("resolving {}", r.name);
+            let ret_type = r.resolve_ret_type(&mut ret_type_map,&self.rules);
         }
 
-        // let mut has_lifetime_map = HashMap::new();
-        
-        // for r in &self.rules {
-        //     match &r.value {
-        //         RuleValue::Union(type_defs) => {
-        //             let mut has_non_hook = false;
-        //             for type_def in type_defs {
-        //                 let hooked_type = pt_type_map.get(type_def).unwrap();
-        //                 let unhooked_type = pt_internal_type_map.get(type_def).unwrap();
-        //                 // println!(
-        //                 //     "    {}, {},",
-        //                 //     hooked_type,
-        //                 //     unhooked_type,
-        //                 // );
-        //                 //pt_union_variants.insert(hooked_type, hooked_type != unhooked_type);
-        //                 if hooked_type == unhooked_type {
-        //                     has_non_hook = true;
-        //                     break;
-        //                 }
-        //             }
-        //             has_lifetime_map.insert(r.identifier.clone(), true)
-        //         },
-        //         _ => has_lifetime_map.insert(r.identifier.clone(), true)
-        //     };
-            
-        // }
+
         
 
-        for r in &self.rules {
-            println!("// {id}", id = &r.identifier);
+        for (name, r) in &self.rules {
+            println!("// {id}", id = &r.name);
             self.emit_rust_ast_rule(r, &ast_type_map);
             self.emit_rust_pt_rule(
                 r,
@@ -881,8 +782,8 @@ impl LangDef {
         }
     }
 
-    fn emit_rust_ast_rule(&self, rule: &RuleDef, ast_type_map: &HashMap<String, String>) {
-        let id = &rule.identifier;
+    fn emit_rust_ast_rule(&self, rule: &Rule, ast_type_map: &HashMap<String, String>) {
+        let id = &rule.name;
 
         
         match &rule.value {
@@ -989,77 +890,21 @@ impl LangDef {
         }
     }
 
-    fn resolve_non_struct_ret(&self, pvt: &RetType, ast_type_map: &HashMap<String, String>, pt_type_map: &HashMap<String, String>, pt_internal_type_map: &HashMap<String, String>) -> String {
-        match pvt {
-            RetType::Unresolved(err) => {
-                panic!("Unresolved return type: {err}");
-            },
-            RetType::Struct => {
-                panic!("Don't call this function for struct return type")
-            },
-            RetType::Param(p) => {
-                match p {
-                    ParamType::Item(optional, name) => {
-                        let pt_type = pt_type_map.get(name).unwrap();
-                        //let lifetime = if *has_lifetime_map.get(name).unwrap() { "<'p>" } else {""};
+    // fn resolve_non_struct_ret(&self, pvt: &RetType, ast_type_map: &HashMap<String, String>, pt_type_map: &HashMap<String, String>, pt_internal_type_map: &HashMap<String, String>) -> String {
+        
 
-                        if *optional {
-                            format!("Box<Option<{pt_type}>>")
-                        } else {
-                            format!("Box<{pt_type}>")
-                        }
-                    },
-                    ParamType::String(optional) => {
-                        if *optional {
-                            "Option<String>".to_string()
-                        } else {
-                            "String".to_string()
-                        }
-                    },
-                    ParamType::Bool => {
-                        "bool".to_string()
-                    },
-                }
-            }
-            RetType::Vec(p) => {
-                match p {
-                    ParamType::Item(optional, name) => {
-                        let pt_type = pt_type_map.get(name).unwrap();
-                        //let ast_type = ast_type_map.get(name).unwrap();
-                       // let lifetime = if pt_type == pt_internal_type_map.get(name).unwrap() { "<'p>" } else {""};
-
-                        if *optional {
-                            format!("VecDeque<Option<{pt_type}>>")
-                        } else {
-                            format!("VecDeque<{pt_type}>")
-                        }
-                    },
-                    ParamType::String(optional) => {
-                        if *optional {
-                            "VecDeque<Option<String>>".to_string()
-                        } else {
-                            "VecDeque<String>".to_string()
-                        }
-                    },
-                    ParamType::Bool => {
-                        "VecDeque<bool>".to_string()
-                    },
-                }
- 
-            },
-
-        }
-    }
+        
+    // }
 
     fn emit_rust_pt_rule(
         &self,
-        rule: &RuleDef,
+        rule: &Rule,
         ast_type_map: &HashMap<String, String>,
         pt_type_map: &HashMap<String, String>,
         pt_internal_type_map: &HashMap<String, String>,
-        ret_type_map: &HashMap<String, RetType>,
+        ret_type_map: &HashMap<String, RetType2>,
     ) {
-        let id = &rule.identifier;
+        let id = &rule.name;
         let ast_type = ast_type_map.get(id).unwrap();
         let pt_type = pt_type_map.get(id).unwrap();
         let pt_internal_type = pt_internal_type_map.get(id).unwrap();
@@ -1070,6 +915,7 @@ impl LangDef {
             None => "from_ast",
             Some(_) => "from_ast_internal",
         };
+
         match &rule.value {
             RuleValue::Union(type_defs) => {
                 // println!("regen::generate_ast_union!({t},", t=ast_type_map.get(id).unwrap());
@@ -1127,6 +973,18 @@ impl LangDef {
                 
             }
             RuleValue::Function(params, body) => {
+                        // PT declaration:
+// if it is union, it's special, we can skip that
+// function:
+// All PTs have ast
+
+
+// implementation:
+// first parse all relavant members
+// then how to construct the return value?
+
+
+// seemes like RetType can be directly computed from Expr
                 // Bind parameters to their types and the AST member names
                 let mut bind_ast_vars = HashMap::new();
                 let mut param_types = HashMap::new();
@@ -1140,70 +998,103 @@ impl LangDef {
                 println!("#[derive(Debug)] pub struct {pt_internal_type}<'p> {{");
                 // ast reference
                 println!("    pub ast: &'p {ast_type},");
+                let vars = body.get_vars();
+
                 // if return type is a vector, also store the ast references of the vector items
-                if let RetType::Vec(item) = rt_type {
-                    match item {
-                        ParamType::Item(optional, name) => {
-                            let ast_type = ast_type_map.get(name).unwrap();
-    
-                            if *optional {
-                                println!("    pub ast_vec: VecDeque<Option<&'p {ast_type}>>,");
-                            } else {
-                                println!("    pub ast_vec: VecDeque<&'p {ast_type}>,");
-                            }
-                        },
-                        ParamType::String(optional) => {
-                            if *optional {
-                                println!("    pub ast_vec: VecDeque<Option<&'p Token>>,");
-                            } else {
-                                println!("    pub ast_vec: VecDeque<&'p Token>,");
-                            }
-                        },
-                        ParamType::Bool => {
-                            println!("    pub ast_vec: VecDeque<&'p Token>,");
-                        },
-                    }
-                    
-                }
-                match rt_type {
-                    RetType::Struct => {
-                        match body {
-                            Expr::Dict(vars) => {
-                                //println!("#[derive(Debug)] pub struct Dict{pt_internal_type_map} {{");
-                                for var in vars {
-                                    let var_type = param_types.get(var).unwrap();
-                                    let member = to_snake_case(var);
-                                    match var_type {
-                                        ParamType::Item(optional, name) => {
-                                            let pt_type = pt_type_map.get(name).unwrap();
-                                            //let lifetime = if pt_type == pt_internal_type_map.get(name).unwrap() { "<'p>" } else {""};
-                                            if *optional {
-                                                println!("    pub m_{member}: Box<Option<{pt_type}>>,");
-                                            } else {
-                                                println!("    pub m_{member}: Box<{pt_type}>,");
-                                            }
-                                        },
-                                        ParamType::String(optional) => {
-                                            if *optional {
-                                                println!("    pub m_{member}: Option<String>,");
-                                            } else {
-                                                println!("    pub m_{member}: String,");
-                                            }
-                                        },
-                                        ParamType::Bool => {
-                                            println!("    pub m_{member}: bool,");
-                                        },
-                                    }
-                                }
-                                //p//rintln!("}}");
+                // we have to first check VecType. if it is a vec (path A), we need to declare asts and vals
+                if let RetType2::Vec(item) = rt_type {
+                    let mut asts_type = String::from("VecDeque<");
+                    let mut vals_type = String::from("VecDeque<");
+                    let mut nest_level = 1;
+                    // Declare asts and vals
+                    let mut next_item = item.as_ref();
+                    loop {
+                        match next_item {
+                            RetType2::Vec(item) => {
+                                asts_type.push_str("VecDeque<");
+                                vals_type.push_str("VecDeque<");
+                                nest_level += 1;
+                                next_item = item.as_ref();
                             },
-                            _ => {
-                                panic!("Struct return type must have dict body");
-                            }
+                            RetType2::Unit(item) => {
+                                match item {
+                                    ParamType::Item(optional, name) => {
+                                        let ast_type = ast_type_map.get(name).unwrap();
+                                        let pt_type = pt_type_map.get(name).unwrap();
+                
+                                        if *optional {
+                                            asts_type.push_str(&format!("Option<&'p {ast_type}>"));
+                                            vals_type.push_str(&format!("Option<{pt_type}>"));
+                                        } else {
+                                            asts_type.push_str(&format!("&'p {ast_type}"));
+                                            vals_type.push_str(pt_type);
+                                        }
+                                    },
+                                    ParamType::String(optional) => {
+                                        if *optional {
+                                            asts_type.push_str("Option<&'p Token>");
+                                            vals_type.push_str("Option<String>");
+                                        } else {
+                                            asts_type.push_str("&'p Token");
+                                            vals_type.push_str("String");
+                                        }
+                                    },
+                                    ParamType::Bool => {
+                                        asts_type.push_str("&'p Token");
+                                        vals_type.push_str("bool");
+                                    },
+                                }
+                                
+                                break;
+                            },
+                            _ => unreachable!()
                         }
                     }
-                    _ => println!("    pub val: {t}", t=self.resolve_non_struct_ret(rt_type, ast_type_map, pt_type_map, pt_internal_type_map)),
+
+                    for _ in 0..nest_level {
+                        asts_type.push('>');
+                        vals_type.push('>');
+                    }
+                    println!("    pub asts: {asts_type},");
+                    println!("    pub vals: {vals_type},");
+                }else{
+                    // check body
+                    // Otherwise, we need to check RetType.
+                    // If it is a struct, we need to declare m_x, m_y, ... (path B)
+                    // otherwise only need to declare m_x (path C)
+                    for var in &vars {
+                        let var_type = param_types.get(var).unwrap();
+                        let member = to_snake_case(var);
+                        match var_type {
+                            ParamType::Item(optional, name) => {
+                                let pt_type = pt_type_map.get(name).unwrap();
+                                if *optional {
+                                    println!("    pub m_{member}: Box<Option<{pt_type}>>,");
+                                } else {
+                                    println!("    pub m_{member}: Box<{pt_type}>,");
+                                }
+                            },
+                            ParamType::String(optional) => {
+                                if *optional {
+                                    println!("    pub m_{member}: Option<String>,");
+                                } else {
+                                    println!("    pub m_{member}: String,");
+                                }
+                            },
+                            ParamType::Bool => {
+                                println!("    pub m_{member}: bool,");
+                            },
+                        }
+                    }
+                    
+                   
                 }
+                // match rt_type {
+                //     RetType::Struct => {
+                        
+                //     }
+                //     _ => ,
+                // }
                 println!("}}");
                 // if let RetType::Struct = rt_type {
                 //     match body {
@@ -1243,7 +1134,7 @@ impl LangDef {
                 println!("impl<'p> {pt_internal_type}<'p> {{");
                 println!("    fn {macro_func_name}(ast: &'p {ast_type}, _si: &mut SemInfo, _errors: &mut Vec<RegenError>) -> Self {{");
 
-                //let last_mutable = if let Expr::Concat(_) = &body { true } else { false };
+                
 
                 let vars = body.get_vars();
                 for var in vars {
@@ -1273,50 +1164,61 @@ impl LangDef {
                         
                     }
                 }
+                // check body expr:
+// if concat (path A)
+// if dict (path B)
+// if var, can be either path A or path C, depending on VecType
+
+// scenarios:
+
+
                 match &body {
                     Expr::Concat(vars) => {
+                        // 4. return a concatenation VecType = Vec, RetType = Vec, Expr = Concat
+//    implementation: move the asts and vals over, push_front the rest
                         let last = vars.last().unwrap();
                         let last_type = param_types.get(last).unwrap();
                         let last_member = to_snake_case(&last);
-                        println!("        let val = m_{last_member};");
-                        println!("        let (mut val, mut ast_vec) =");
-                        match last_type {
-                            ParamType::Item(optional, name) => {
-                                let mut ret_type = ret_type_map.get(name).unwrap();
-                                let mut optional = *optional;
-                                let mut nest = 0;
-                                loop {
+                        println!("        let mut vals = m_{last_member}.vals;");
+                        println!("        let mut asts = m_{last_member}.asts;");
+                        //println!("        let (mut val, mut ast_vec) =");
+                       // match last_type {
+                        //     ParamType::Item(optional, name) => {
+                        //         let mut ret_type = ret_type_map.get(name).unwrap();
+                        //         let mut optional = *optional;
+                        //         let mut nest = 0;
+                        //         loop {
                                     
 
-                                    match ret_type {
-                                        RetType::Vec(_) => {
-                                            if optional {
-                                                println!("            match *val {{ None => (VecDeque::new(), VecDeque::new()), Some(v) => (v.val, v.ast_vec) }}"); 
-                                            } else {
-                                                println!("            (val.val, val.ast_vec)");
-                                            }
-                                            println!("        {};", "}".repeat(nest));
-                                            break;
-                                        },
-                                        RetType::Param(ParamType::Item(next_optional, next_name)) => {
-                                            if optional {
-                                                println!("            match *val {{ None => (VecDeque::new(), VecDeque::new()), Some(v) => {{ let val = v.val;");
-                                                nest += 2; 
-                                            } else {
-                                                println!("            {{ let val = val.val;");
-                                                nest += 1;
-                                            }
-                                            optional = *next_optional;
-                                            ret_type = ret_type_map.get(next_name).unwrap();
-                                        },
-                                        _ => unreachable!()
+                        //             match ret_type {
+                        //                 RetType::Vec(_) => {
+                        //                     if optional {
+                        //                         println!("            match *val {{ None => (VecDeque::new(), VecDeque::new()), Some(v) => (v.val, v.ast_vec) }}"); 
+                        //                     } else {
+                        //                         println!("            (val.val, val.ast_vec)");
+                        //                     }
+                        //                     println!("        {};", "}".repeat(nest));
+                        //                     break;
+                        //                 },
+                        //                 RetType::Param(ParamType::Item(next_optional, next_name)) => {
+                        //                     if optional {
+                        //                         println!("            match *val {{ None => (VecDeque::new(), VecDeque::new()), Some(v) => {{ let val = v.val;");
+                        //                         nest += 2; 
+                        //                     } else {
+                        //                         println!("            {{ let val = val.val;");
+                        //                         nest += 1;
+                        //                     }
+                        //                     optional = *next_optional;
+                        //                     ret_type = ret_type_map.get(next_name).unwrap();
+                        //                 },
+                        //                 _ => unreachable!()
 
-                                    }
-                                }
+                        //             }
+                        //         }
                                 
-                            },
-                            _ => unreachable!()
-                        }
+                        //     },
+                        //     _ => unreachable!()
+                        // }
                         
                         for var in vars.iter().rev().skip(1) {
                             let var_type = param_types.get(var).unwrap();
@@ -1325,35 +1227,51 @@ impl LangDef {
                             
                             match var_type {
                                 ParamType::Item(optional, _) => {
-                                    println!("        val.push_front(*m_{member});");
+                                    println!("        vals.push_front(*m_{member});");
                                     if *optional {
-                                        println!("        ast_vec.push_front(ast.{ast_var}.as_ref());");
+                                        println!("        asts.push_front(ast.{ast_var}.as_ref());");
                                     } else {
-                                        println!("        ast_vec.push_front(&ast.{ast_var});");
+                                        println!("        asts.push_front(&ast.{ast_var});");
                                     }
                                 },
                                 ParamType::String(optional) => {
-                                    println!("        val.push_front(m_{member});");
+                                    println!("        vals.push_front(m_{member});");
                                     if *optional {
-                                        println!("        ast_vec.push_front(ast.{ast_var}.as_ref());");
+                                        println!("        asts.push_front(ast.{ast_var}.as_ref());");
                                     } else {
-                                        println!("        ast_vec.push_front(&ast.{ast_var});");
+                                        println!("        asts.push_front(&ast.{ast_var});");
                                     }
                                 },
                                 ParamType::Bool => {
-                                    println!("        val.push_front(m_{member});");
-                                    println!("        ast_vec.push_front(ast.{ast_var}.as_ref());");
+                                    println!("        vals.push_front(m_{member});");
+                                    println!("        asts.push_front(ast.{ast_var}.as_ref());");
                                 }
                                 
                             }
                         }
-                        println!("        Self {{ ast, val, ast_vec }}");
+                        println!("        Self {{ ast, vals, asts }}");
                     },
                     Expr::Var(var) => {
+                        // 1. return a single non-vec value VecType = Unit, RetType = Param, Expr = Var
+//    implementation: move the val over
+// 2. return a single vec value VecType = Vec, RetType = Param, Expr = Var
+//    implementation: move the asts and vals over
                         let member = to_snake_case(&var);
-                        println!("        Self {{ ast, val: m_{member} }}");
+                        match rt_type {
+                            RetType2::Unit(_) => {
+                                println!("        Self {{ ast, m_{member} }}");
+                            },
+                            RetType2::Vec(_) => {
+                                println!("        Self {{ ast, vals: m_{member}.vals, asts: m_{member}.asts }}");
+                            },
+                            _ => unreachable!()
+                        }
+                        //println!("        Self {{ ast, val: m_{member} }}");
                     },
                     Expr::Dict(vars) => {
+                        // 3. return a struct  VecType = Unit, RetType = Struct, Expr = Dict
+//    implementation: create the struct and move the val over
+
                         println!("        Self {{");
                         println!("            ast,");
                         for var in vars {

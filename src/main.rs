@@ -172,6 +172,6 @@ fn main() -> Result<(), &'static str> {
 }
 
 fn emit_self() {
-    let lang = regen::core::LangDef::make_test();
+    let mut lang = regen::core::LangDef::make_test();
     lang.emit_rust();
 }

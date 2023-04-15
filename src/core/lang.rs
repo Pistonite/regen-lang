@@ -4,7 +4,7 @@ use crate::sdk::generated::{PTRuleDefineBody, PTTopLevelDefine, PTTopLevelStatem
 use crate::sdk::RegenError;
 use crate::{err, tree_cast};
 
-use super::rule::{Rule, RuleValue, RetType};
+use super::rule::{Rule, RuleValue, RetType2};
 use super::token::{TokenDef, TokenRule};
 
 /// Definition of a language defined with Regen
@@ -31,25 +31,26 @@ impl TryFrom<Vec<PTTopLevelStatement<'_>>> for RegenLangDef {
         let semantics = validate_references(&pt)?;
 
         // If good, take out objects from PT
-        let (tokens, token_rules, rules, emit_actions) = extract_from_pt(pt);
+        let (tokens, token_rules, mut rules, emit_actions) = extract_from_pt(pt);
 
         // Resolve return types
-        let mut ret_type_map = HashMap::new();
+        //let mut ret_type_map = HashMap::new();
         let mut rule_map = HashMap::new();
-        for r in &rules {
+        let mut ret_type_map = HashMap::new();
+        for r in rules {
             rule_map.insert(r.name.clone(), r);
         }
-        for r in &rules {
+        for r in rule_map.values() {
             r.resolve_ret_type(&mut ret_type_map, &rule_map);
         }
 
         let mut errors = Vec::new();
 
-        for (r, ret_type) in &ret_type_map {
-            if let RetType::Unresolved(msg) = ret_type {
+        for (name, r) in &rule_map {
+            if let RetType2::Unresolved(msg) = ret_type_map.get(name).unwrap() {
                 errors.push(RegenError {
                     pos: (0,1),
-                    msg: format!("Rule {} has unresolved return type: {}", r, msg),
+                    msg: format!("Rule {} has unresolved return type: {}", name, msg),
                 });
             }
         }
@@ -58,15 +59,12 @@ impl TryFrom<Vec<PTTopLevelStatement<'_>>> for RegenLangDef {
             return Err(errors);
         }
 
-        let mut rule_map2 = HashMap::new();
-        for r in rules {
-            rule_map2.insert(r.name.clone(), r);
-        }
+
         Ok(Self {
             tokens,
             token_rules,
             semantics,
-            rules: rule_map2,
+            rules: rule_map,
             emit_actions,
         })
     }

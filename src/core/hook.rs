@@ -42,3 +42,13 @@ pub fn parse_hook(pt: &PTHookAttribute, _si: &mut SemInfo, _errors: &mut Vec<Reg
         return_type: pt.m_hook_type.clone(),
     })
 }
+
+macro_rules! hook {
+    ($name:literal : $type:literal) => {
+        Hook {
+            name: $name.to_owned(),
+            return_type: $type.to_owned(),
+        }
+    };
+}
+pub(crate) use hook;

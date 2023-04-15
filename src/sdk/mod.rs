@@ -39,7 +39,7 @@ impl RegenError {
         let m = &self.msg;
         eprintln!("Error at line {l}, column {c}: {m}");
 
-        let start = (l-context).max(1);
+        let start = if l > context { l - context } else { 1 };
         for (i, line_str) in source.lines().skip(start-1).take(context*2+1).enumerate() {
             let current = i+start;
             eprintln!("{current:3} | {line_str}");
