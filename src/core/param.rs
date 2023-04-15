@@ -1,7 +1,6 @@
-use crate::err;
-use crate::sdk::generated::{PTParam, PTParamList, SemInfo, Semantics};
-use crate::sdk::RegenError;
 use super::rule::ParamType;
+use crate::sdk::generated::{PTParam, PTParamList, SemInfo, Semantics};
+use crate::sdk::Error;
 
 /// Parameter of a rule derivation.
 ///
@@ -72,27 +71,30 @@ impl Param {
 pub fn parse_param_list(
     pt: &mut PTParamList,
     _si: &mut SemInfo,
-    errors: &mut Vec<RegenError>,
+    errors: &mut Vec<Error>,
 ) -> Option<Vec<Param>> {
     // There aren't going to be many params, so it's fine to use not use a hash set for deduplication
     let mut params = Vec::new();
-    for param in pt.val.iter_mut() {
+    for param in pt.vals.iter_mut() {
         // Make sure param is valid before taking it out
         let param_val = match param.val.as_ref() {
-            None => { continue; },
-            Some(_) => param.take_unchecked()
+            None => {
+                continue;
+            }
+            Some(_) => param.take_unchecked(),
         };
         // If param won't be in PT, it's fine to have duplicate names
         if !param_val.is_in_pt() {
             // Still need to add it so we can give better error message when validation function bodies.
             params.push(param_val);
             continue;
-        } 
+        }
 
         let name = &param_val.name;
         if params.iter().find(|p| &p.name == name).is_some() {
-            let msg = format!("Duplicate parameter name: {}", name);
-            errors.push(err!(param.pt.ast.m_variable_1, msg));
+            let msg = format!("Duplicate parameter name: \"{}\"", name);
+            let help = "Rename the parameter or remove the duplicate.".to_string();
+            errors.push(Error::from_token(&param.pt.ast.m_variable_1, msg, help));
             // Don't add duplicate params
         } else {
             params.push(param_val);
@@ -103,10 +105,12 @@ pub fn parse_param_list(
 
 /// Parser hook for param
 /// Checks if type is defined and if semantic is valid
-pub fn parse_param(pt: &PTParam, si: &mut SemInfo, errors: &mut Vec<RegenError>) -> Option<Param> {
+pub fn parse_param(pt: &PTParam, si: &mut SemInfo, errors: &mut Vec<Error>) -> Option<Param> {
     // Validate parameter type is defined
     let param_type = pt.m_type.as_ref().as_ref().or_else(|| {
-        errors.push(err!(pt.ast.m___2, "Missing parameter type".to_owned()));
+        let msg = "Missing parameter type".to_owned();
+        let help = "Add a type after \":\"".to_owned();
+        errors.push(Error::from_token(&pt.ast.m___2, msg, help));
         None
     })?;
 
@@ -117,12 +121,11 @@ pub fn parse_param(pt: &PTParam, si: &mut SemInfo, errors: &mut Vec<RegenError>)
         .m_sem_attr
         .as_ref()
         .as_ref()
-        .and_then(|sem| match &sem.val {
+        .and_then(|sem| match &sem.m_semantic_name {
             None => {
-                errors.push(err!(
-                    sem.ast.m___0,
-                    "Missing semantic annotation".to_owned()
-                ));
+                let msg = "Missing semantic annotation".to_owned();
+                let help = "Add semantic annotation inside \"()\"".to_owned();
+                errors.push(Error::from_token(&sem.ast.m___0, msg, help));
 
                 None
             }
@@ -283,6 +286,5 @@ macro_rules! param {
             match_literal: Some($spec.to_string()),
         }
     };
-    
 }
 pub(crate) use param;

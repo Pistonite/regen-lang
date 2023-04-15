@@ -1,6 +1,5 @@
 use crate::sdk::generated::{PTExpression, SemInfo};
-use crate::sdk::RegenError;
-use crate::err;
+use crate::sdk::Error;
 
 /// Expression used in a function rule derivation body.
 #[derive(Debug)]
@@ -26,39 +25,35 @@ impl Expr {
         match self {
             Expr::Concat(vars) => vars.clone(),
             Expr::Var(identifier) => vec![identifier.clone()],
-            Expr::Dict(vars) => vars.clone()
+            Expr::Dict(vars) => vars.clone(),
         }
     }
 }
 
 /// Parser hook for Expr
-pub fn parse_expr(pt: &PTExpression, _si: &mut SemInfo, errors: &mut Vec<RegenError>) -> Option<Expr> {
+pub fn parse_expr(pt: &PTExpression, _si: &mut SemInfo, errors: &mut Vec<Error>) -> Option<Expr> {
     match pt {
         PTExpression::PTConcatExpression(pt) => {
             // Make sure we have at least 1 item
-            let vars = &pt.val;
-            if vars.is_empty() {
-                let msg = "Concat expression must have at least two items".to_owned();
-                errors.push(err!(pt.ast.m_first_0, msg));
-                return None;
-            }
-            if vars.len() == 1{
+            let vars = &pt.vals;
+            // Vars cannot be empty because of language
+            assert!(!vars.is_empty());
+            if vars.len() == 1 {
                 // If only 1 item, we treat it as a variable
                 return Some(Expr::Var(vars[0].clone()));
             }
             Some(Expr::Concat(vars.clone().into()))
-        },
+        }
         PTExpression::PTDictExpression(pt) => {
-            // Make sure we have at least one item
-            match pt.val.as_ref().as_ref().filter(|x| !x.val.is_empty()) {
-                None => {
-                    let msg = "Cannot make empty dictionary. Consider using an optional rule."
-                        .to_owned();
-                    errors.push(err!(pt.ast.m___0, msg));
-                    return None;
-                }
-                Some(x) => Some(Expr::Dict(x.val.clone().into())),
+            // Make sure we have at least 1 item
+            let vars = &pt.vals;
+            if vars.is_empty() {
+                let msg = "Cannot make empty dictionary.".to_owned();
+                let help = "If this rule is optional when deriving, consider making that parameter optional (i.e. foo: optional Bar).".to_owned();
+                errors.push(Error::from_token(&pt.ast.m___0, msg, help));
+                return None;
             }
+            Some(Expr::Dict(vars.clone().into()))
         }
     }
 }

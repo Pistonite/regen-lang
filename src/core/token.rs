@@ -6,7 +6,7 @@ use crate::sdk::generated::{
     SemInfo,
     Semantics
 };
-use crate::sdk::RegenError;
+use crate::sdk::Error;
 
 /// Definition for a token type used by the tokenizer
 ///
@@ -41,7 +41,7 @@ pub enum TokenRule {
     RegExp(String /* token_type */,String),
 }
 
-pub fn parse_token_def(pt: &PTDefineTokenTypeStatement, si: &mut SemInfo, _errors: &mut Vec<RegenError>) -> Option<TokenDef> {
+pub fn parse_token_def(pt: &PTDefineTokenTypeStatement, si: &mut SemInfo, _errors: &mut Vec<Error>) -> Option<TokenDef> {
     if pt.m_kw_extract {
         // Extracted tokens are not used in AST generation. Tag it to indicate that
         si.set(&pt.ast.m_token_type_2, Semantics::Tag("unused".to_owned(), Box::new(Semantics::SToken)))
@@ -52,24 +52,24 @@ pub fn parse_token_def(pt: &PTDefineTokenTypeStatement, si: &mut SemInfo, _error
     })
 }
 
-pub fn parse_token_ignore_rule(pt: &PTDefineIgnoreTokenRuleStatement, _si: &mut SemInfo, _errors: &mut Vec<RegenError>) -> Option<TokenRule> {
-    match pt.val.as_ref() {
+pub fn parse_token_ignore_rule(pt: &PTDefineIgnoreTokenRuleStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Option<TokenRule> {
+    match pt.m_value.as_ref() {
         PTLiteralOrRegExp::PTTokenLiteral(literal) => {
-            Some(TokenRule::IgnoreLiteral(literal.val.clone()))
+            Some(TokenRule::IgnoreLiteral(literal.m_t.clone()))
         },
         PTLiteralOrRegExp::PTTokenRegExp(regexp) => {
-            Some(TokenRule::IgnoreRegExp(regexp.val.clone()))
+            Some(TokenRule::IgnoreRegExp(regexp.m_t.clone()))
         }
     }
 }
 
-pub fn parse_token_rule(pt: &PTDefineTokenRuleStatement, _si: &mut SemInfo, _errors: &mut Vec<RegenError>) -> Option<TokenRule> {
+pub fn parse_token_rule(pt: &PTDefineTokenRuleStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Option<TokenRule> {
     match pt.m_value.as_ref() {
         PTLiteralOrRegExp::PTTokenLiteral(literal) => {
-            Some(TokenRule::Literal(pt.m_token_type.clone(), literal.val.clone()))
+            Some(TokenRule::Literal(pt.m_token_type.clone(), literal.m_t.clone()))
         },
         PTLiteralOrRegExp::PTTokenRegExp(regexp) => {
-            Some(TokenRule::RegExp(pt.m_token_type.clone(), regexp.val.clone()))
+            Some(TokenRule::RegExp(pt.m_token_type.clone(), regexp.m_t.clone()))
         }
     }
 }

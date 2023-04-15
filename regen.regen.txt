@@ -94,12 +94,12 @@ rule UnionRuleListTail(
     (Rule) first: token Identifier,
     rest: optional UnionRuleListTail
 ) first | rest;
-
+/*
 rule A(a: B, b: optional A1) a | b;
 rule B(t:token Literal) t;
 rule A1(t: A2) t;
 rule A2(a: B, b: optional A1) a | b;
-
+*/
 rule FunctionalRuleBody(
     _: token Symbol"(",
     params: optional ParamList,
@@ -188,11 +188,3 @@ rule DictExpression(
 // VariableList is at least one variable.
 rule VariableList((Variable) first: token Identifier, rest: optional VariableListTail) first | rest;
 rule VariableListTail(_: token Symbol",", rest: optional VariableList) rest;
-
-// ExpressionList is at least one expression.
-// rule ExpressionList(first: Expression, rest: optional ExpressionListTail) first | rest;
-// rule ExpressionListTail(_: token Symbol",", rest: optional ExpressionList) rest;
-
-// LiteralList is at least one literal.
-// rule LiteralList(first: token Literal, rest: optional LiteralListTail) first | rest;
-// rule LiteralListTail(_: token Symbol",", rest: LiteralList) rest;

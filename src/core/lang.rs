@@ -1,10 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::sdk::generated::{PTRuleDefineBody, PTTopLevelDefine, PTTopLevelStatement};
-use crate::sdk::RegenError;
-use crate::{err, tree_cast};
+use crate::sdk::generated::{
+    ASTDefineRuleStatement, PTRuleDefineBody, PTTopLevelDefine, PTTopLevelStatement,
+};
+use crate::sdk::Error;
+use crate::tree_cast;
 
-use super::rule::{Rule, RuleValue, RetType2};
+use super::rule::{RetType, Rule, RuleValue};
 use super::token::{TokenDef, TokenRule};
 
 /// Definition of a language defined with Regen
@@ -15,43 +17,62 @@ use super::token::{TokenDef, TokenRule};
 ///   The syntax of the regex depends on the target language
 /// - a set of semantics, defined with the `semantics` keyword
 /// - a set of derivations, defined with the `rule` keyword
-pub struct RegenLangDef {
+pub struct Language {
+    target: String,
     tokens: Vec<TokenDef>,
     token_rules: Vec<TokenRule>,
     semantics: HashSet<String>,
     rules: HashMap<String, Rule>,
     emit_actions: Vec<EmitAction>,
+    ret_types: HashMap<String, RetType>,
 }
 
-impl TryFrom<Vec<PTTopLevelStatement<'_>>> for RegenLangDef {
-    type Error = Vec<RegenError>;
+impl TryFrom<Vec<PTTopLevelStatement<'_>>> for Language {
+    type Error = Vec<Error>;
     fn try_from(pt: Vec<PTTopLevelStatement>) -> Result<Self, Self::Error> {
         // Validate that identifier references everywhere are valid
         // If not, we can't continue
         let semantics = validate_references(&pt)?;
 
         // If good, take out objects from PT
-        let (tokens, token_rules, mut rules, emit_actions) = extract_from_pt(pt);
+        let (tokens, token_rules, rule_vec, emit_actions, rule_ast_vec) = extract_from_pt(pt);
+
+        // We need at least 1 rule
+        let mut errors = Vec::new();
+        if rule_vec.is_empty() {
+            errors.push(Error::global("No rule defined.".to_owned(), "Define a rule with the \"rule\" keyword.".to_owned()));
+            return Err(errors);
+        }
+        let target = rule_vec.first().unwrap().name.clone();
 
         // Resolve return types
-        //let mut ret_type_map = HashMap::new();
-        let mut rule_map = HashMap::new();
-        let mut ret_type_map = HashMap::new();
-        for r in rules {
-            rule_map.insert(r.name.clone(), r);
+        let mut rules = HashMap::new();
+        let mut rule_asts = HashMap::new();
+        for (rule, ast) in rule_vec.into_iter().zip(rule_ast_vec) {
+            rule_asts.insert(rule.name.clone(), ast);
+            rules.insert(rule.name.clone(), rule);
         }
-        for r in rule_map.values() {
-            r.resolve_ret_type(&mut ret_type_map, &rule_map);
-        }
+        let mut ret_types = HashMap::new();
+        rules
+            .get(&target)
+            .unwrap()
+            .resolve_ret_type(&mut ret_types, &rules);
 
-        let mut errors = Vec::new();
-
-        for (name, r) in &rule_map {
-            if let RetType2::Unresolved(msg) = ret_type_map.get(name).unwrap() {
-                errors.push(RegenError {
-                    pos: (0,1),
-                    msg: format!("Rule {} has unresolved return type: {}", name, msg),
-                });
+        for (name, _) in &rules {
+            match ret_types.get(name) {
+                Some(RetType::Unresolved(msg)) => {
+                    let ast = rule_asts.get(name).unwrap();
+                    let msg = format!("Cannot resolve return type for rule \"{name}\": {msg}");
+                    let help = "Check the parameters and body of the rule.".to_owned();
+                    errors.push(Error::from_token(&ast.m_rule_name_2, msg, help));
+                }
+                None => {
+                    let ast = rule_asts.get(name).unwrap();
+                    let msg = format!("Rule \"{name}\" is not referenced by target \"{target}\"");
+                    let help = "Remove or comment out the rule.".to_owned();
+                    errors.push(Error::from_token(&ast.m_rule_name_2, msg, help));
+                }
+                _ => {}
             }
         }
 
@@ -59,21 +80,21 @@ impl TryFrom<Vec<PTTopLevelStatement<'_>>> for RegenLangDef {
             return Err(errors);
         }
 
-
         Ok(Self {
+            target,
             tokens,
             token_rules,
             semantics,
-            rules: rule_map,
+            rules,
             emit_actions,
+            ret_types,
         })
     }
 }
 
-
 fn validate_references(
     pt: &[PTTopLevelStatement],
-) -> Result<HashSet<String> /* semantics */, Vec<RegenError>> {
+) -> Result<HashSet<String> /* semantics */, Vec<Error>> {
     let mut errors = Vec::new();
 
     let mut token_names = HashSet::new();
@@ -87,7 +108,7 @@ fn validate_references(
     for pt in pt {
         match pt {
             PTTopLevelStatement::PTTopLevelDefineStatement(stmt) => {
-                match stmt.val.as_ref() {
+                match stmt.m_body.as_ref() {
                     PTTopLevelDefine::PTDefineTokenTypeStatement(token_def) => {
                         let name = &token_def.val.as_ref().unwrap().name;
                         if token_names.contains(name) {
@@ -121,19 +142,29 @@ fn validate_references(
     // validate that referenced names exist
     for pt in pt {
         match pt {
-            PTTopLevelStatement::PTTopLevelDefineStatement(stmt) => match stmt.val.as_ref() {
+            PTTopLevelStatement::PTTopLevelDefineStatement(stmt) => match stmt.m_body.as_ref() {
                 PTTopLevelDefine::PTDefineTokenTypeStatement(token_def) => {
                     let name = &token_def.val.as_ref().unwrap().name;
                     if duplicate_token_names.contains(name) {
                         let msg = format!("Duplicate token definition: {}", name);
-                        errors.push(err!(token_def.as_ref().pt.ast.m_token_type_2, msg));
+                        let help = "Remove or rename the duplicate definition".to_owned();
+                        errors.push(Error::from_token(
+                            &token_def.as_ref().pt.ast.m_token_type_2,
+                            msg,
+                            help,
+                        ));
                     }
                 }
                 PTTopLevelDefine::PTDefineSemanticStatement(semantic) => {
                     let name = semantic.val.as_ref().unwrap();
                     if duplicate_semantics.contains(name) {
                         let msg = format!("Duplicate semantic definition: {}", name);
-                        errors.push(err!(semantic.as_ref().pt.ast.m_id_1, msg));
+                        let help = "Remove or rename the duplicate definition".to_owned();
+                        errors.push(Error::from_token(
+                            &semantic.as_ref().pt.ast.m_id_1,
+                            msg,
+                            help,
+                        ));
                     }
                 }
                 PTTopLevelDefine::PTDefineTokenRuleStatement(rule) => {
@@ -142,11 +173,14 @@ fn validate_references(
                     {
                         if !token_names.contains(name) {
                             let msg = format!("Undefined token type: {}", name);
-                            errors.push(err!(rule.as_ref().pt.ast.m_token_type_0, msg));
+                            errors.push(Error::from_token_without_help(
+                                &rule.as_ref().pt.ast.m_token_type_0,
+                                msg,
+                            ));
                         }
                     }
                 }
-                _ => {},
+                _ => {}
             },
             PTTopLevelStatement::PTDefineRuleStatement(rule_pt) => {
                 // Make sure self is not duplicated
@@ -154,7 +188,12 @@ fn validate_references(
                 let name = &rule.name;
                 if duplicated_rule_names.contains(name) {
                     let msg = format!("Duplicate rule definition: {}.", name);
-                    errors.push(err!(rule_pt.as_ref().pt.ast.m_rule_name_2, msg));
+                    let help = "Remove or rename the duplicate definition".to_owned();
+                    errors.push(Error::from_token(
+                        &rule_pt.as_ref().pt.ast.m_rule_name_2,
+                        msg,
+                        help,
+                    ));
                 }
                 // Make sure all referenced rules exist
 
@@ -165,12 +204,10 @@ fn validate_references(
                         assert!(!subrules.is_empty());
                         let pt = &rule_pt.as_ref().pt.m_body.as_ref().pt;
                         let pt = tree_cast!(PTRuleDefineBody::PTUnionRuleBody pt);
-                        let pt = pt.val.as_ref().as_ref().unwrap();
-                        for (next_rule, token) in pt.val.iter().zip(pt.ast_vec.iter()) {
+                        for (next_rule, token) in pt.vals.iter().zip(pt.asts.iter()) {
                             if !rule_names.contains(next_rule) {
                                 let msg = format!("Undefined rule: {}.", next_rule);
-                                errors.push(err!(token, msg));
-                                eprintln!("{:?}", &rule_names);
+                                errors.push(Error::from_token_without_help(token, msg));
                             }
                         }
                     }
@@ -180,27 +217,26 @@ fn validate_references(
                         let pt = tree_cast!(PTRuleDefineBody::PTFunctionalRuleBody pt);
                         let pt = &pt.m_params.as_ref().as_ref().unwrap().pt;
 
-                        for (param, ast) in params.iter().zip(pt.ast_vec.iter()) {
+                        for (param, ast) in params.iter().zip(pt.asts.iter()) {
                             if param.is_token {
                                 if !token_names.contains(&param.type_name) {
-                                    let msg = format!(
-                                        "Parameter \"{}\" has an undefined token type {}.",
-                                        param.name, param.type_name
-                                    );
-                                    errors.push(err!(
-                                        ast.m_type_3.as_ref().as_ref().unwrap().m_id_2,
-                                        msg
+                                    let msg = format!("Undefined token type: {}", param.type_name);
+                                    let help =
+                                        format!("Token type \"{}\" is undefined", param.name);
+                                    errors.push(Error::from_token(
+                                        &ast.m_type_3.as_ref().as_ref().unwrap().m_id_2,
+                                        msg,
+                                        help,
                                     ));
                                 }
                             } else {
                                 if !rule_names.contains(&param.type_name) {
-                                    let msg = format!(
-                                        "Parameter \"{}\" has an undefined rule type {}.",
-                                        param.name, param.type_name
-                                    );
-                                    errors.push(err!(
-                                        ast.m_type_3.as_ref().as_ref().unwrap().m_id_2,
-                                        msg
+                                    let msg = format!("Undefined rule: {}.", param.type_name);
+                                    let help = format!("Rule \"{}\" is undefined.", param.name);
+                                    errors.push(Error::from_token(
+                                        &ast.m_type_3.as_ref().as_ref().unwrap().m_id_2,
+                                        msg,
+                                        help,
                                     ));
                                 }
                             }
@@ -223,16 +259,18 @@ fn extract_from_pt(
     Vec<TokenRule>,
     Vec<Rule>,
     Vec<EmitAction>,
+    Vec<&ASTDefineRuleStatement>,
 ) {
     let mut tokens = Vec::new();
     let mut token_rules = Vec::new();
     let mut rules = Vec::new();
     let mut emit_actions = Vec::new();
+    let mut rule_asts = Vec::new();
 
     for pt in pt {
         match pt {
             PTTopLevelStatement::PTTopLevelDefineStatement(stmt) => {
-                match *stmt.val {
+                match *stmt.m_body {
                     PTTopLevelDefine::PTDefineTokenTypeStatement(mut token_def) => {
                         tokens.push(token_def.take_unchecked());
                     }
@@ -246,11 +284,12 @@ fn extract_from_pt(
                         token_rules.push(token_rule.take_unchecked());
                     }
                     PTTopLevelDefine::PTTokenLiteral(comment) => {
-                        emit_actions.push(EmitAction::Comment(comment.val));
+                        emit_actions.push(EmitAction::Comment(comment.m_t));
                     }
                 }
             }
             PTTopLevelStatement::PTDefineRuleStatement(mut rule) => {
+                rule_asts.push(rule.as_ref().pt.ast);
                 let rule = rule.take_unchecked();
                 let name = rule.name.clone();
                 rules.push(rule);
@@ -258,7 +297,7 @@ fn extract_from_pt(
             }
         }
     }
-    (tokens, token_rules, rules, emit_actions)
+    (tokens, token_rules, rules, emit_actions, rule_asts)
 }
 
 enum EmitAction {

@@ -1,5 +1,5 @@
 use crate::sdk::generated::{PTHookAttribute, SemInfo};
-use crate::sdk::RegenError;
+use crate::sdk::Error;
 
 /// Definition of a Parser Hook
 /// 
@@ -36,7 +36,7 @@ pub struct Hook {
     pub return_type: String,
 }
 
-pub fn parse_hook(pt: &PTHookAttribute, _si: &mut SemInfo, _errors: &mut Vec<RegenError>) -> Option<Hook> {
+pub fn parse_hook(pt: &PTHookAttribute, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Option<Hook> {
     Some(Hook {
         name: pt.m_hook_name.clone(),
         return_type: pt.m_hook_type.clone(),

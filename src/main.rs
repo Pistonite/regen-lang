@@ -4,7 +4,7 @@
 use clap::ArgMatches;
 use clap::{Command, Arg};
 
-use regen::core;
+use regen::emit;
 
 
 use std::fs;
@@ -38,19 +38,11 @@ fn arg_input() -> Arg {
         .required(true)
 }
 
-fn arg_header() -> Arg {
-    Arg::new("HEADER")
-        .long("header")
-        .help("Include the content of a header file in the output before the code")
-        .action(clap::ArgAction::Set)
-        .num_args(1)
-        .default_value("")
-}
-
-fn arg_footer() -> Arg {
-    Arg::new("FOOTER")
-        .long("footer")
-        .help("Include the content of a footer file in the output after the code")
+fn arg_template() -> Arg {
+    Arg::new("TEMPLATE")
+        .short('t')
+        .long("template")
+        .help("File name for the context file, which is interleaved with the output.")
         .action(clap::ArgAction::Set)
         .num_args(1)
         .default_value("")
@@ -63,20 +55,20 @@ fn read_input(matches: &ArgMatches) -> String {
 
 fn write_output(content: &str, matches: &ArgMatches) {
     let output = matches.get_one::<String>("OUTPUT").unwrap();
-    let header = matches.get_one::<String>("HEADER").unwrap();
-    let footer = matches.get_one::<String>("FOOTER").unwrap();
-    let mut buf = String::new();
-    if !header.is_empty() {
-        buf.push_str(&fs::read_to_string(header).unwrap());
-    }
-    buf.push_str(content);
-    if !footer.is_empty() {
-        buf.push_str(&fs::read_to_string(footer).unwrap());
-    }
+    // let header = matches.get_one::<String>("HEADER").unwrap();
+    // let footer = matches.get_one::<String>("FOOTER").unwrap();
+    // let mut buf = String::new();
+    // if !header.is_empty() {
+    //     buf.push_str(&fs::read_to_string(header).unwrap());
+    // }
+    // buf.push_str(content);
+    // if !footer.is_empty() {
+    //     buf.push_str(&fs::read_to_string(footer).unwrap());
+    // }
     if output.is_empty() {
-        println!("{}", buf);
+        println!("{}", content);
     } else {
-        fs::write(output, buf).unwrap()
+        fs::write(output, content).unwrap()
     }
 }
 
@@ -96,65 +88,47 @@ fn main() -> Result<(), &'static str> {
                 .arg(arg_input())
                 .arg(arg_output())
                 .arg(arg_stack())
-                .arg(arg_header())
-                .arg(arg_footer())
                 .arg(
                     Arg::new("TARGET")
-                        .short('t')
+                        .short('T')
                         .long("target")
                         .help("The target language.")
                         .action(clap::ArgAction::Set)
-                        .value_parser(["rs", "self", "ts", "py"])
+                        .value_parser(["rs", "ts", "py"])
                         .num_args(1)
                         .default_value("rs")
                 )
         )
         .subcommand(
-            Command::new("tokenize")
-                .about("Tokenize the input grammar file (does not include semantic analysis)")
+            Command::new("html")
+                .about("Highlight the input grammar file and generate HTML for the highlighted code")
                 .arg(arg_input())
                 .arg(arg_output())
-                .arg(arg_header())
-                .arg(arg_footer())
-        )
-        .subcommand(
-            Command::new("highlight")
-                .about("Highlight the input grammar file (includes semantic analysis)")
-                .arg(arg_input())
-                .arg(arg_output())
-                .arg(arg_header())
-                .arg(arg_footer())
                 .arg(arg_stack())
+                .arg(arg_template())
         );
+        
 
     match matches.get_matches().subcommand() {
         Some(("sdk", matches)) => {
             emit_self()
         },
-        Some(("tokenize", matches)) => {
-            let input = read_input(matches);
-            let ctx = regen::sdk::tokenize(&input);
-            let mut output = ctx.si.get_html();
-            output.push('\n');
+        Some(("html", matches)) => {
+            let source = read_input(matches);
+            let stack_size = matches.get_one::<usize>("STACK").unwrap();
+            let template = matches.get_one::<String>("TEMPLATE").unwrap();
+            let template_html = if template.is_empty() {
+                String::from(include_str!("./emit/default.html"))
+            } else {
+                fs::read_to_string(template).unwrap()
+            };
+            let (output, errors) = emit::emit_html(&template_html, &source, *stack_size);
             write_output(&output, matches);
-        },
-        Some(("highlight", matches)) => {
-            let input = read_input(matches);
-            let stack = matches.get_one::<usize>("STACK").unwrap();
-            let mut ctx = regen::sdk::tokenize(&input).ast_all_unchecked(*stack);
-            let pt = ctx.parse_unchecked();
-            let lang: Result<core::lang::RegenLangDef, Vec<regen::sdk::RegenError>> = pt.try_into();
-            if let Err(mut e) = lang {
-                ctx.err.append(&mut e);
-            }
-            let mut output = ctx.si.get_html();
-            output.push('\n');
-            write_output(&output, matches);
-            if !ctx.err.is_empty() {
-                for e in ctx.err {
-                    e.pretty_print(&input, 2);
+            if !errors.is_empty() {
+                for e in errors {
+                    eprintln!("{}", &e.pretty(&source, 1).unwrap());
                 }
-                return Err("Errors found when parsing the input file.");
+                return Err("Errors found when parsing the  file.");
             }
         },
         _ => {}
