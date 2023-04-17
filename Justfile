@@ -1,6 +1,6 @@
 sdk:
     cp src/sdk/generated.rs src/sdk/generated.rs.old
-    cargo run sdk 1 > src/sdk/generated.rs.tmp
+    cargo run sdk regen.regen.txt -t rust-self -o src/sdk/generated.rs.tmp
     mv src/sdk/generated.rs.tmp src/sdk/generated.rs
 
 

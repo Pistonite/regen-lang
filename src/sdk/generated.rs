@@ -1,1013 +1,771 @@
+/*
+  Generated with regen-lang v0.0.1
+*/
+//// /* src/sdk/generated.rs.pp */
+/* 
+ This is the preprocessor file for generated.rs.
 
-/*SDK_RS*/// header
-/*SDK_RS*/use crate as regen;
-/*SDK_RS*/// =================================================================================================
-/*SDK_RS*///#![allow(non_snake_case)]
-/*SDK_RS*/use crate::core::{
-/*SDK_RS*/    rule::{parse_rule, Rule, parse_rule_value, RuleValue},
-/*SDK_RS*/    expr::{parse_expr, Expr},
-/*SDK_RS*/    param::{parse_param, Param, parse_param_list},
-/*SDK_RS*/    hook::{parse_hook, Hook},
-/*SDK_RS*/    semantic::parse_semantic,
-/*SDK_RS*/    token::{parse_token_def, TokenDef, parse_token_ignore_rule, parse_token_rule, TokenRule}
-/*SDK_RS*/};
-regen::sdk!(
-    target: (PTTopLevelStatement, ASTTopLevelStatement);
-    tokens: [
-        TComment,
-        TKeyword,
-        TIdentifier,
-        TRegExp,
-        TLiteral,
-        TSymbol,
-    ];
-    regex: [
-        re0 = r"^\s+",
-        re1 = r"^//[^\n]*\n?",
-        re2 = r"^/\*([^\*]|(\*[^/]))*\*/",
-        re3 = r#"^"((\\.)|[^\\"])*""#,
-        re4 = r"^/((\\.)|[^\\/])*/",
-        re15 = r"^[{};|()=,:\.\[\]]",
-        re16 = r"^[_a-zA-Z]\w*",
-    ];
-    rules: [
-        [re0],
-        [true, TComment, re1],
-        [true, TComment, re2],
-        [false, TLiteral, re3],
-        [false, TRegExp, re4],
-        [false, TKeyword, "ignore", 6],
-        [false, TKeyword, "extract", 7],
-        [false, TKeyword, "token", 5],
-        [false, TKeyword, "semantic", 8],
-        [false, TKeyword, "hook", 4],
-        [false, TKeyword, "rule", 4],
-        [false, TKeyword, "optional", 8],
-        [false, TKeyword, "or", 2],
-        [false, TKeyword, "null", 4],
-        [false, TKeyword, "vigorous", 8],
-        [false, TSymbol, re15],
-        [false, TIdentifier, re16],
-    ];
-    semantics: [
-        SVariable,
-        SToken,
-        SSemantic,
-        SRule,
-        SHookName,
-        SHookType,
-    ];
+ In regen grammar files, you can specify a literal string appended with ";" as a statement to include another file
+ THe path is relative to the grammar file. This is useful for including import for hook and others
+
+ Included files at the beginning or end of the grammar file will be included in the beginning or end of the generated file, in the order they are specified. Includes in the middle of the grammar file will be included in the middle if the implementation of the target language allows it.
+
+ (Honestly there is no reason to include something in the middle.. right?)
+*/
+#![cfg_attr(rustfmt, rustfmt_skip)]
+// Hooks
+// Since hooks are defined in the grammar file as literal strings, we need to include the implementation here.
+use crate::core::{Rule, RuleValue, Expr, Param, Hook, TokenDef, TokenRule};
+use crate::core::rule::{parse_rule, parse_rule_value};
+use crate::core::expr::parse_expr;
+use crate::core::param::{parse_param, parse_param_list};
+use crate::core::hook::parse_hook;
+use crate::core::token::{parse_token_def, parse_token_ignore_rule, parse_token_rule};
+use crate::core::semantic::parse_semantic;
+//// /* src/sdk/generated.rs.pp */
+crate::sdk!(
+  crate;
+  target: TopLevelStatement;
+  tokens: [
+    TComment,
+    TKeyword,
+    TIdentifier,
+    TRegExp,
+    TLiteral,
+    TSymbol,
+  ];
+  regex: [
+    re0 = r"^\s+",
+    re1 = r"^//[^\n]*\n?",
+    re2 = r"^/\*([^\*]|(\*[^/]))*\*/",
+    re3 = r#"^"((\\.)|[^\\"])*""#,
+    re4 = r"^/((\\.)|[^\\/])*/",
+    re5 = r"^[{};|()=,:\.\[\]]",
+    re6 = r"^[_a-zA-Z]\w*",
+  ];
+  rules: [
+    [re0],
+    [true, TComment, re1],
+    [true, TComment, re2],
+    [false, TLiteral, re3],
+    [false, TRegExp, re4],
+    [false, TKeyword, "ignore", 6],
+    [false, TKeyword, "extract", 7],
+    [false, TKeyword, "token", 5],
+    [false, TKeyword, "semantic", 8],
+    [false, TKeyword, "rule", 4],
+    [false, TKeyword, "optional", 8],
+    [false, TSymbol, re5],
+    [false, TIdentifier, re6],
+  ];
+  semantics: [
+    SVariable,
+    SToken,
+    SSemantic,
+    SRule,
+    SHookName,
+    SHookType,
+  ];
 );
-// =============================
-// AST
-// UnionRuleListTail
-#[derive(Debug)]
-pub struct ASTUnionRuleListTail {
-    pub m___0: Token<Tokens>,
-    pub m_first_1: Token<Tokens>,
-    pub m_rest_2: Box<Option<ASTUnionRuleListTail>>,
-}
-impl ASTUnionRuleListTail {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m___0 = token!(TSymbol::"|"(ts))?;
-        let m_first_1 = token!(TIdentifier::parse(ts))?;
-        let m_rest_2 = optional!(ts, ASTUnionRuleListTail::parse(ts));
-        Some(Self {
-            m___0,
-            m_first_1,
-            m_rest_2: Box::new(m_rest_2),
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        _si.set(&self.m_first_1, Semantics::SRule);
-        if let Some(m) = self.m_rest_2.as_ref() { m.apply_semantic(_si); }
-    }
-}
-#[derive(Debug)] pub struct PTUnionRuleListTail<'p> {
-    pub ast: &'p ASTUnionRuleListTail,
-    pub asts: VecDeque<&'p Token<Tokens>>,
-    pub vals: VecDeque<String>,
-}
-impl<'p> PTUnionRuleListTail<'p> {
-    fn from_ast(ast: &'p ASTUnionRuleListTail, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_first = ast.m_first_1.value.clone();
-        let m_rest = if let Some(v) = ast.m_rest_2.as_ref() { Box::new(Some(PTUnionRuleListTail::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        let (mut asts, mut vals) = move_pt_vec_optional!(m_rest);
-        vals.push_front(m_first);
-        asts.push_front(&ast.m_first_1);
-        Self { ast, vals, asts }
-    }
-}
-// ParamListTail
-#[derive(Debug)]
-pub struct ASTParamListTail {
-    pub m___0: Token<Tokens>,
-    pub m_first_1: Box<ASTParam>,
-    pub m_rest_2: Box<Option<ASTParamListTail>>,
-}
-impl ASTParamListTail {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m___0 = token!(TSymbol::","(ts))?;
-        let m_first_1 = ASTParam::parse(ts)?;
-        let m_rest_2 = optional!(ts, ASTParamListTail::parse(ts));
-        Some(Self {
-            m___0,
-            m_first_1: Box::new(m_first_1),
-            m_rest_2: Box::new(m_rest_2),
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        self.m_first_1.apply_semantic(_si);
-        if let Some(m) = self.m_rest_2.as_ref() { m.apply_semantic(_si); }
-    }
-}
-#[derive(Debug)] pub struct PTParamListTail<'p> {
-    pub ast: &'p ASTParamListTail,
-    pub asts: VecDeque<&'p ASTParam>,
-    pub vals: VecDeque<ParseHook<Param, PTParam<'p>>>,
-}
-impl<'p> PTParamListTail<'p> {
-    fn from_ast(ast: &'p ASTParamListTail, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_first = Box::new(PTParam::from_ast(&ast.m_first_1.as_ref(), _si, _errors));
-        let m_rest = if let Some(v) = ast.m_rest_2.as_ref() { Box::new(Some(PTParamListTail::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        let (mut asts, mut vals) = move_pt_vec_optional!(m_rest);
-        vals.push_front(*m_first);
-        asts.push_front(&ast.m_first_1);
-        Self { ast, vals, asts }
-    }
-}
-// ParamList
-#[derive(Debug)]
-pub struct ASTParamList {
-    pub m_first_0: Box<ASTParam>,
-    pub m_rest_1: Box<Option<ASTParamListTail>>,
-}
-impl ASTParamList {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m_first_0 = ASTParam::parse(ts)?;
-        let m_rest_1 = optional!(ts, ASTParamListTail::parse(ts));
-        Some(Self {
-            m_first_0: Box::new(m_first_0),
-            m_rest_1: Box::new(m_rest_1),
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        self.m_first_0.apply_semantic(_si);
-        if let Some(m) = self.m_rest_1.as_ref() { m.apply_semantic(_si); }
-    }
-}
-#[derive(Debug)] pub struct PTParamList<'p> {
-    pub ast: &'p ASTParamList,
-    pub asts: VecDeque<&'p ASTParam>,
-    pub vals: VecDeque<ParseHook<Param, PTParam<'p>>>,
-}
-impl<'p> PTParamList<'p> {
-    fn from_ast_internal(ast: &'p ASTParamList, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_first = Box::new(PTParam::from_ast(&ast.m_first_0.as_ref(), _si, _errors));
-        let m_rest = if let Some(v) = ast.m_rest_1.as_ref() { Box::new(Some(PTParamListTail::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        let (mut asts, mut vals) = move_pt_vec_optional!(m_rest);
-        vals.push_front(*m_first);
-        asts.push_front(&ast.m_first_0);
-        Self { ast, vals, asts }
-    }
-}
-impl<'p> PTParamList<'p> {
-    #[inline] fn from_ast(ast: &'p ASTParamList, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<Vec<Param>, PTParamList<'p>> {
-        let mut pt = Self::from_ast_internal(ast, si, err);
-        ParseHook { val: parse_param_list(&mut pt, si, err), pt }
-    }
-}
-// UnionRuleList
-#[derive(Debug)]
-pub struct ASTUnionRuleList {
-    pub m_first_0: Token<Tokens>,
-    pub m_rest_1: Box<Option<ASTUnionRuleListTail>>,
-}
-impl ASTUnionRuleList {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m_first_0 = token!(TIdentifier::parse(ts))?;
-        let m_rest_1 = optional!(ts, ASTUnionRuleListTail::parse(ts));
-        Some(Self {
-            m_first_0,
-            m_rest_1: Box::new(m_rest_1),
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        _si.set(&self.m_first_0, Semantics::SRule);
-        if let Some(m) = self.m_rest_1.as_ref() { m.apply_semantic(_si); }
-    }
-}
-#[derive(Debug)] pub struct PTUnionRuleList<'p> {
-    pub ast: &'p ASTUnionRuleList,
-    pub asts: VecDeque<&'p Token<Tokens>>,
-    pub vals: VecDeque<String>,
-}
-impl<'p> PTUnionRuleList<'p> {
-    fn from_ast(ast: &'p ASTUnionRuleList, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_first = ast.m_first_0.value.clone();
-        let m_rest = if let Some(v) = ast.m_rest_1.as_ref() { Box::new(Some(PTUnionRuleListTail::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        let (mut asts, mut vals) = move_pt_vec_optional!(m_rest);
-        vals.push_front(m_first);
-        asts.push_front(&ast.m_first_0);
-        Self { ast, vals, asts }
-    }
-}
-// TopLevelDefine
-regen::impl_union!(from_ast,
-[ASTTopLevelDefine, 
-    ASTTokenLiteral,
-    ASTDefineTokenTypeStatement,
-    ASTDefineIgnoreTokenRuleStatement,
-    ASTDefineTokenRuleStatement,
-    ASTDefineSemanticStatement,
-], [PTTopLevelDefine<'p>, 
-    PTTokenLiteral<'p>, PTTokenLiteral,
-    ParseHook<TokenDef, PTDefineTokenTypeStatement<'p>>, PTDefineTokenTypeStatement,
-    ParseHook<TokenRule, PTDefineIgnoreTokenRuleStatement<'p>>, PTDefineIgnoreTokenRuleStatement,
-    ParseHook<TokenRule, PTDefineTokenRuleStatement<'p>>, PTDefineTokenRuleStatement,
-    ParseHook<String, PTDefineSemanticStatement<'p>>, PTDefineSemanticStatement,
-],);
-#[derive(Debug)] pub enum PTTopLevelDefine<'p> { 
-    PTTokenLiteral(Box<PTTokenLiteral<'p>>),
-    PTDefineIgnoreTokenRuleStatement(Box<ParseHook<TokenRule, PTDefineIgnoreTokenRuleStatement<'p>>>),
-    PTDefineTokenRuleStatement(Box<ParseHook<TokenRule, PTDefineTokenRuleStatement<'p>>>),
-    PTDefineTokenTypeStatement(Box<ParseHook<TokenDef, PTDefineTokenTypeStatement<'p>>>),
-    PTDefineSemanticStatement(Box<ParseHook<String, PTDefineSemanticStatement<'p>>>),
-}
-// DefineIgnoreTokenRuleStatement
-#[derive(Debug)]
-pub struct ASTDefineIgnoreTokenRuleStatement {
-    pub m___0: Token<Tokens>,
-    pub m_value_1: Box<ASTLiteralOrRegExp>,
-}
-impl ASTDefineIgnoreTokenRuleStatement {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m___0 = token!(TKeyword::"ignore"(ts))?;
-        let m_value_1 = ASTLiteralOrRegExp::parse(ts)?;
-        Some(Self {
-            m___0,
-            m_value_1: Box::new(m_value_1),
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        self.m_value_1.apply_semantic(_si);
-    }
-}
-#[derive(Debug)] pub struct PTDefineIgnoreTokenRuleStatement<'p> {
-    pub ast: &'p ASTDefineIgnoreTokenRuleStatement,
-    pub m_value: Box<PTLiteralOrRegExp<'p>>,
-}
-impl<'p> PTDefineIgnoreTokenRuleStatement<'p> {
-    fn from_ast_internal(ast: &'p ASTDefineIgnoreTokenRuleStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_value = Box::new(PTLiteralOrRegExp::from_ast(&ast.m_value_1.as_ref(), _si, _errors));
-        Self { ast, m_value }
-    }
-}
-impl<'p> PTDefineIgnoreTokenRuleStatement<'p> {
-    #[inline] fn from_ast(ast: &'p ASTDefineIgnoreTokenRuleStatement, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<TokenRule, PTDefineIgnoreTokenRuleStatement<'p>> {
-        let mut pt = Self::from_ast_internal(ast, si, err);
-        ParseHook { val: parse_token_ignore_rule(&mut pt, si, err), pt }
-    }
-}
-// TopLevelStatement
-regen::impl_union!(from_ast,
-[ASTTopLevelStatement, 
-    ASTDefineRuleStatement,
-    ASTTopLevelDefineStatement,
-], [PTTopLevelStatement<'p>, 
-    ParseHook<Rule, PTDefineRuleStatement<'p>>, PTDefineRuleStatement,
-    PTTopLevelDefineStatement<'p>, PTTopLevelDefineStatement,
-],);
-#[derive(Debug)] pub enum PTTopLevelStatement<'p> { 
-    PTDefineRuleStatement(Box<ParseHook<Rule, PTDefineRuleStatement<'p>>>),
-    PTTopLevelDefineStatement(Box<PTTopLevelDefineStatement<'p>>),
-}
-// LiteralOrRegExp
-regen::impl_union!(from_ast,
-[ASTLiteralOrRegExp, 
-    ASTTokenLiteral,
-    ASTTokenRegExp,
-], [PTLiteralOrRegExp<'p>, 
-    PTTokenLiteral<'p>, PTTokenLiteral,
-    PTTokenRegExp<'p>, PTTokenRegExp,
-],);
-#[derive(Debug)] pub enum PTLiteralOrRegExp<'p> { 
-    PTTokenLiteral(Box<PTTokenLiteral<'p>>),
-    PTTokenRegExp(Box<PTTokenRegExp<'p>>),
-}
-// DefineTokenTypeStatement
-#[derive(Debug)]
-pub struct ASTDefineTokenTypeStatement {
-    pub m_kw_extract_0: Option<Token<Tokens>>,
-    pub m___1: Token<Tokens>,
-    pub m_token_type_2: Token<Tokens>,
-}
-impl ASTDefineTokenTypeStatement {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m_kw_extract_0 = optional!(ts, token!(TKeyword::"extract"(ts)));
-        let m___1 = token!(TKeyword::"token"(ts))?;
-        let m_token_type_2 = token!(TIdentifier::parse(ts))?;
-        Some(Self {
-            m_kw_extract_0,
-            m___1,
-            m_token_type_2,
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        _si.set(&self.m_token_type_2, Semantics::SToken);
-    }
-}
-#[derive(Debug)] pub struct PTDefineTokenTypeStatement<'p> {
-    pub ast: &'p ASTDefineTokenTypeStatement,
-    pub m_kw_extract: bool,
-    pub m_token_type: String,
-}
-impl<'p> PTDefineTokenTypeStatement<'p> {
-    fn from_ast_internal(ast: &'p ASTDefineTokenTypeStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_kw_extract = !ast.m_kw_extract_0.is_none();
-        let m_token_type = ast.m_token_type_2.value.clone();
-        Self {
-            ast,
-            m_kw_extract,
-            m_token_type,
-        }
-    }
-}
-impl<'p> PTDefineTokenTypeStatement<'p> {
-    #[inline] fn from_ast(ast: &'p ASTDefineTokenTypeStatement, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<TokenDef, PTDefineTokenTypeStatement<'p>> {
-        let mut pt = Self::from_ast_internal(ast, si, err);
-        ParseHook { val: parse_token_def(&mut pt, si, err), pt }
-    }
-}
-// TokenRegExp
-#[derive(Debug)]
-pub struct ASTTokenRegExp {
-    pub m_t_0: Token<Tokens>,
-}
-impl ASTTokenRegExp {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m_t_0 = token!(TRegExp::parse(ts))?;
-        Some(Self {
-            m_t_0,
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-    }
-}
-#[derive(Debug)] pub struct PTTokenRegExp<'p> {
-    pub ast: &'p ASTTokenRegExp,
-    pub m_t: String,
-}
-impl<'p> PTTokenRegExp<'p> {
-    fn from_ast(ast: &'p ASTTokenRegExp, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_t = ast.m_t_0.value.clone();
-        Self { ast, m_t }
-    }
-}
-// ParamSemantic
-#[derive(Debug)]
-pub struct ASTParamSemantic {
-    pub m___0: Token<Tokens>,
-    pub m_semantic_name_1: Option<Token<Tokens>>,
-    pub m___2: Token<Tokens>,
-}
-impl ASTParamSemantic {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m___0 = token!(TSymbol::"("(ts))?;
-        let m_semantic_name_1 = optional!(ts, token!(TIdentifier::parse(ts)));
-        let m___2 = token!(TSymbol::")"(ts))?;
-        Some(Self {
-            m___0,
-            m_semantic_name_1,
-            m___2,
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        if let Some(m) = &self.m_semantic_name_1 { _si.set(m, Semantics::SSemantic); }
-    }
-}
-#[derive(Debug)] pub struct PTParamSemantic<'p> {
-    pub ast: &'p ASTParamSemantic,
-    pub m_semantic_name: Option<String>,
-}
-impl<'p> PTParamSemantic<'p> {
-    fn from_ast(ast: &'p ASTParamSemantic, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_semantic_name = ast.m_semantic_name_1.as_ref().map(|t| t.value.clone());
-        Self { ast, m_semantic_name }
-    }
-}
-// DefineSemanticStatement
-#[derive(Debug)]
-pub struct ASTDefineSemanticStatement {
-    pub m___0: Token<Tokens>,
-    pub m_id_1: Token<Tokens>,
-}
-impl ASTDefineSemanticStatement {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m___0 = token!(TKeyword::"semantic"(ts))?;
-        let m_id_1 = token!(TIdentifier::parse(ts))?;
-        Some(Self {
-            m___0,
-            m_id_1,
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        _si.set(&self.m_id_1, Semantics::SSemantic);
-    }
-}
-#[derive(Debug)] pub struct PTDefineSemanticStatement<'p> {
-    pub ast: &'p ASTDefineSemanticStatement,
-    pub m_id: String,
-}
-impl<'p> PTDefineSemanticStatement<'p> {
-    fn from_ast_internal(ast: &'p ASTDefineSemanticStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_id = ast.m_id_1.value.clone();
-        Self { ast, m_id }
-    }
-}
-impl<'p> PTDefineSemanticStatement<'p> {
-    #[inline] fn from_ast(ast: &'p ASTDefineSemanticStatement, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<String, PTDefineSemanticStatement<'p>> {
-        let mut pt = Self::from_ast_internal(ast, si, err);
-        ParseHook { val: parse_semantic(&mut pt, si, err), pt }
-    }
-}
-// VariableListTail
-#[derive(Debug)]
-pub struct ASTVariableListTail {
-    pub m___0: Token<Tokens>,
-    pub m_rest_1: Box<Option<ASTVariableList>>,
-}
-impl ASTVariableListTail {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m___0 = token!(TSymbol::","(ts))?;
-        let m_rest_1 = optional!(ts, ASTVariableList::parse(ts));
-        Some(Self {
-            m___0,
-            m_rest_1: Box::new(m_rest_1),
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        if let Some(m) = self.m_rest_1.as_ref() { m.apply_semantic(_si); }
-    }
-}
-#[derive(Debug)] pub struct PTVariableListTail<'p> {
-    pub ast: &'p ASTVariableListTail,
-    pub asts: VecDeque<&'p Token<Tokens>>,
-    pub vals: VecDeque<String>,
-}
-impl<'p> PTVariableListTail<'p> {
-    fn from_ast(ast: &'p ASTVariableListTail, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_rest = if let Some(v) = ast.m_rest_1.as_ref() { Box::new(Some(PTVariableList::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        let (asts, vals) = move_pt_vec_optional!(m_rest);
-        Self { ast, vals, asts }
-    }
-}
-// Param
-#[derive(Debug)]
-pub struct ASTParam {
-    pub m_sem_attr_0: Box<Option<ASTParamSemantic>>,
-    pub m_variable_1: Token<Tokens>,
-    pub m___2: Token<Tokens>,
-    pub m_type_3: Box<Option<ASTRuleType>>,
-}
-impl ASTParam {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m_sem_attr_0 = optional!(ts, ASTParamSemantic::parse(ts));
-        let m_variable_1 = token!(TIdentifier::parse(ts))?;
-        let m___2 = token!(TSymbol::":"(ts))?;
-        let m_type_3 = optional!(ts, ASTRuleType::parse(ts));
-        Some(Self {
-            m_sem_attr_0: Box::new(m_sem_attr_0),
-            m_variable_1,
-            m___2,
-            m_type_3: Box::new(m_type_3),
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        if let Some(m) = self.m_sem_attr_0.as_ref() { m.apply_semantic(_si); }
-        _si.set(&self.m_variable_1, Semantics::SVariable);
-        if let Some(m) = self.m_type_3.as_ref() { m.apply_semantic(_si); }
-    }
-}
-#[derive(Debug)] pub struct PTParam<'p> {
-    pub ast: &'p ASTParam,
-    pub m_sem_attr: Box<Option<PTParamSemantic<'p>>>,
-    pub m_variable: String,
-    pub m_type: Box<Option<PTRuleType<'p>>>,
-}
-impl<'p> PTParam<'p> {
-    fn from_ast_internal(ast: &'p ASTParam, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_sem_attr = if let Some(v) = ast.m_sem_attr_0.as_ref() { Box::new(Some(PTParamSemantic::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        let m_variable = ast.m_variable_1.value.clone();
-        let m_type = if let Some(v) = ast.m_type_3.as_ref() { Box::new(Some(PTRuleType::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        Self {
-            ast,
-            m_sem_attr,
-            m_variable,
-            m_type,
-        }
-    }
-}
-impl<'p> PTParam<'p> {
-    #[inline] fn from_ast(ast: &'p ASTParam, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<Param, PTParam<'p>> {
-        let mut pt = Self::from_ast_internal(ast, si, err);
-        ParseHook { val: parse_param(&mut pt, si, err), pt }
-    }
-}
-// RuleDefineBody
-regen::impl_union!(from_ast_internal,
-[ASTRuleDefineBody, 
-    ASTUnionRuleBody,
-    ASTFunctionalRuleBody,
-], [PTRuleDefineBody<'p>, 
-    PTUnionRuleBody<'p>, PTUnionRuleBody,
-    PTFunctionalRuleBody<'p>, PTFunctionalRuleBody,
-],);
-#[derive(Debug)] pub enum PTRuleDefineBody<'p> { 
-    PTUnionRuleBody(Box<PTUnionRuleBody<'p>>),
-    PTFunctionalRuleBody(Box<PTFunctionalRuleBody<'p>>),
-}
-impl<'p> PTRuleDefineBody<'p> {
-    #[inline] fn from_ast(ast: &'p ASTRuleDefineBody, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<RuleValue, PTRuleDefineBody<'p>> {
-        let mut pt = Self::from_ast_internal(ast, si, err);
-        ParseHook { val: parse_rule_value(&mut pt, si, err), pt }
-    }
-}
-// UnionRuleBody
-#[derive(Debug)]
-pub struct ASTUnionRuleBody {
-    pub m___0: Token<Tokens>,
-    pub m_rules_1: Box<Option<ASTUnionRuleList>>,
-    pub m___2: Token<Tokens>,
-}
-impl ASTUnionRuleBody {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m___0 = token!(TSymbol::"="(ts))?;
-        let m_rules_1 = optional!(ts, ASTUnionRuleList::parse(ts));
-        let m___2 = token!(TSymbol::";"(ts))?;
-        Some(Self {
-            m___0,
-            m_rules_1: Box::new(m_rules_1),
-            m___2,
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        if let Some(m) = self.m_rules_1.as_ref() { m.apply_semantic(_si); }
-    }
-}
-#[derive(Debug)] pub struct PTUnionRuleBody<'p> {
-    pub ast: &'p ASTUnionRuleBody,
-    pub asts: VecDeque<&'p Token<Tokens>>,
-    pub vals: VecDeque<String>,
-}
-impl<'p> PTUnionRuleBody<'p> {
-    fn from_ast(ast: &'p ASTUnionRuleBody, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_rules = if let Some(v) = ast.m_rules_1.as_ref() { Box::new(Some(PTUnionRuleList::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        let (asts, vals) = move_pt_vec_optional!(m_rules);
-        Self { ast, vals, asts }
-    }
-}
-// DefineTokenRuleStatement
-#[derive(Debug)]
-pub struct ASTDefineTokenRuleStatement {
-    pub m_token_type_0: Token<Tokens>,
-    pub m_value_1: Box<ASTLiteralOrRegExp>,
-}
-impl ASTDefineTokenRuleStatement {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m_token_type_0 = token!(TIdentifier::parse(ts))?;
-        let m_value_1 = ASTLiteralOrRegExp::parse(ts)?;
-        Some(Self {
-            m_token_type_0,
-            m_value_1: Box::new(m_value_1),
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        _si.set(&self.m_token_type_0, Semantics::SToken);
-        self.m_value_1.apply_semantic(_si);
-    }
-}
-#[derive(Debug)] pub struct PTDefineTokenRuleStatement<'p> {
-    pub ast: &'p ASTDefineTokenRuleStatement,
-    pub m_token_type: String,
-    pub m_value: Box<PTLiteralOrRegExp<'p>>,
-}
-impl<'p> PTDefineTokenRuleStatement<'p> {
-    fn from_ast_internal(ast: &'p ASTDefineTokenRuleStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_token_type = ast.m_token_type_0.value.clone();
-        let m_value = Box::new(PTLiteralOrRegExp::from_ast(&ast.m_value_1.as_ref(), _si, _errors));
-        Self {
-            ast,
-            m_token_type,
-            m_value,
-        }
-    }
-}
-impl<'p> PTDefineTokenRuleStatement<'p> {
-    #[inline] fn from_ast(ast: &'p ASTDefineTokenRuleStatement, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<TokenRule, PTDefineTokenRuleStatement<'p>> {
-        let mut pt = Self::from_ast_internal(ast, si, err);
-        ParseHook { val: parse_token_rule(&mut pt, si, err), pt }
-    }
-}
-// ConcatExpression
-#[derive(Debug)]
-pub struct ASTConcatExpression {
-    pub m_first_0: Token<Tokens>,
-    pub m_rest_1: Box<Option<ASTConcatExpressionTail>>,
-}
-impl ASTConcatExpression {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m_first_0 = token!(TIdentifier::parse(ts))?;
-        let m_rest_1 = optional!(ts, ASTConcatExpressionTail::parse(ts));
-        Some(Self {
-            m_first_0,
-            m_rest_1: Box::new(m_rest_1),
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        _si.set(&self.m_first_0, Semantics::SVariable);
-        if let Some(m) = self.m_rest_1.as_ref() { m.apply_semantic(_si); }
-    }
-}
-#[derive(Debug)] pub struct PTConcatExpression<'p> {
-    pub ast: &'p ASTConcatExpression,
-    pub asts: VecDeque<&'p Token<Tokens>>,
-    pub vals: VecDeque<String>,
-}
-impl<'p> PTConcatExpression<'p> {
-    fn from_ast(ast: &'p ASTConcatExpression, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_first = ast.m_first_0.value.clone();
-        let m_rest = if let Some(v) = ast.m_rest_1.as_ref() { Box::new(Some(PTConcatExpressionTail::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        let (mut asts, mut vals) = move_pt_vec_optional!(m_rest);
-        vals.push_front(m_first);
-        asts.push_front(&ast.m_first_0);
-        Self { ast, vals, asts }
-    }
-}
-// DictExpression
-#[derive(Debug)]
-pub struct ASTDictExpression {
-    pub m___0: Token<Tokens>,
-    pub m_values_1: Box<Option<ASTVariableList>>,
-    pub m___2: Token<Tokens>,
-}
-impl ASTDictExpression {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m___0 = token!(TSymbol::"{"(ts))?;
-        let m_values_1 = optional!(ts, ASTVariableList::parse(ts));
-        let m___2 = token!(TSymbol::"}"(ts))?;
-        Some(Self {
-            m___0,
-            m_values_1: Box::new(m_values_1),
-            m___2,
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        if let Some(m) = self.m_values_1.as_ref() { m.apply_semantic(_si); }
-    }
-}
-#[derive(Debug)] pub struct PTDictExpression<'p> {
-    pub ast: &'p ASTDictExpression,
-    pub asts: VecDeque<&'p Token<Tokens>>,
-    pub vals: VecDeque<String>,
-}
-impl<'p> PTDictExpression<'p> {
-    fn from_ast(ast: &'p ASTDictExpression, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_values = if let Some(v) = ast.m_values_1.as_ref() { Box::new(Some(PTVariableList::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        let (asts, vals) = move_pt_vec_optional!(m_values);
-        Self { ast, vals, asts }
-    }
-}
-// FunctionalRuleBody
-#[derive(Debug)]
-pub struct ASTFunctionalRuleBody {
-    pub m___0: Token<Tokens>,
-    pub m_params_1: Box<Option<ASTParamList>>,
-    pub m___2: Token<Tokens>,
-    pub m_body_3: Box<Option<ASTExpression>>,
-    pub m___4: Token<Tokens>,
-}
-impl ASTFunctionalRuleBody {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m___0 = token!(TSymbol::"("(ts))?;
-        let m_params_1 = optional!(ts, ASTParamList::parse(ts));
-        let m___2 = token!(TSymbol::")"(ts))?;
-        let m_body_3 = optional!(ts, ASTExpression::parse(ts));
-        let m___4 = token!(TSymbol::";"(ts))?;
-        Some(Self {
-            m___0,
-            m_params_1: Box::new(m_params_1),
-            m___2,
-            m_body_3: Box::new(m_body_3),
-            m___4,
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        if let Some(m) = self.m_params_1.as_ref() { m.apply_semantic(_si); }
-        if let Some(m) = self.m_body_3.as_ref() { m.apply_semantic(_si); }
-    }
-}
-#[derive(Debug)] pub struct PTFunctionalRuleBody<'p> {
-    pub ast: &'p ASTFunctionalRuleBody,
-    pub m_params: Box<Option<ParseHook<Vec<Param>, PTParamList<'p>>>>,
-    pub m_body: Box<Option<ParseHook<Expr, PTExpression<'p>>>>,
-}
-impl<'p> PTFunctionalRuleBody<'p> {
-    fn from_ast(ast: &'p ASTFunctionalRuleBody, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_params = if let Some(v) = ast.m_params_1.as_ref() { Box::new(Some(PTParamList::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        let m_body = if let Some(v) = ast.m_body_3.as_ref() { Box::new(Some(PTExpression::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        Self {
-            ast,
-            m_params,
-            m_body,
-        }
-    }
-}
-// TopLevelDefineStatement
-#[derive(Debug)]
-pub struct ASTTopLevelDefineStatement {
-    pub m_body_0: Box<ASTTopLevelDefine>,
-    pub m___1: Token<Tokens>,
-}
-impl ASTTopLevelDefineStatement {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m_body_0 = ASTTopLevelDefine::parse(ts)?;
-        let m___1 = token!(TSymbol::";"(ts))?;
-        Some(Self {
-            m_body_0: Box::new(m_body_0),
-            m___1,
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        self.m_body_0.apply_semantic(_si);
-    }
-}
-#[derive(Debug)] pub struct PTTopLevelDefineStatement<'p> {
-    pub ast: &'p ASTTopLevelDefineStatement,
-    pub m_body: Box<PTTopLevelDefine<'p>>,
-}
-impl<'p> PTTopLevelDefineStatement<'p> {
-    fn from_ast(ast: &'p ASTTopLevelDefineStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_body = Box::new(PTTopLevelDefine::from_ast(&ast.m_body_0.as_ref(), _si, _errors));
-        Self { ast, m_body }
-    }
-}
-// DefineRuleStatement
-#[derive(Debug)]
-pub struct ASTDefineRuleStatement {
-    pub m___0: Token<Tokens>,
-    pub m_hook_attr_1: Box<Option<ASTHookAttribute>>,
-    pub m_rule_name_2: Token<Tokens>,
-    pub m_body_3: Box<ASTRuleDefineBody>,
-}
-impl ASTDefineRuleStatement {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m___0 = token!(TKeyword::"rule"(ts))?;
-        let m_hook_attr_1 = optional!(ts, ASTHookAttribute::parse(ts));
-        let m_rule_name_2 = token!(TIdentifier::parse(ts))?;
-        let m_body_3 = ASTRuleDefineBody::parse(ts)?;
-        Some(Self {
-            m___0,
-            m_hook_attr_1: Box::new(m_hook_attr_1),
-            m_rule_name_2,
-            m_body_3: Box::new(m_body_3),
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        if let Some(m) = self.m_hook_attr_1.as_ref() { m.apply_semantic(_si); }
-        _si.set(&self.m_rule_name_2, Semantics::SRule);
-        self.m_body_3.apply_semantic(_si);
-    }
-}
-#[derive(Debug)] pub struct PTDefineRuleStatement<'p> {
-    pub ast: &'p ASTDefineRuleStatement,
-    pub m_hook_attr: Box<Option<ParseHook<Hook, PTHookAttribute<'p>>>>,
+pub mod ast {
+  use super::*;
+  #[derive(Debug)] pub enum TopLevelStatement {
+    DefineRuleStatement(Box<DefineRuleStatement>),
+    TopLevelDefineStatement(Box<TopLevelDefineStatement>),
+  }
+  #[derive(Debug)] pub struct DefineRuleStatement {
+    pub m_0: Token,
+    pub m_hook_attr: Box<Option<HookAttribute>>,
+    pub m_rule_name: Token,
+    pub m_body: Box<RuleDefineBody>,
+  }
+  #[derive(Debug)] pub struct HookAttribute {
+    pub m_0: Token,
+    pub m_hook_name: Token,
+    pub m_2: Token,
+    pub m_hook_type: Token,
+    pub m_4: Token,
+  }
+  #[derive(Debug)] pub enum RuleDefineBody {
+    UnionRuleBody(Box<UnionRuleBody>),
+    FunctionalRuleBody(Box<FunctionalRuleBody>),
+  }
+  #[derive(Debug)] pub struct UnionRuleBody {
+    pub m_0: Token,
+    pub m_rules: Box<Option<UnionRuleList>>,
+    pub m_2: Token,
+  }
+  #[derive(Debug)] pub struct UnionRuleList { pub m_first: Token, pub m_rest: Box<Option<UnionRuleListTail>>, }
+  #[derive(Debug)] pub struct UnionRuleListTail {
+    pub m_0: Token,
+    pub m_first: Token,
+    pub m_rest: Box<Option<UnionRuleListTail>>,
+  }
+  #[derive(Debug)] pub struct FunctionalRuleBody {
+    pub m_0: Token,
+    pub m_params: Box<Option<ParamList>>,
+    pub m_2: Token,
+    pub m_body: Box<Option<Expression>>,
+    pub m_4: Token,
+  }
+  #[derive(Debug)] pub struct ParamList { pub m_first: Box<Parameter>, pub m_rest: Box<Option<ParamListTail>>, }
+  #[derive(Debug)] pub struct ParamListTail {
+    pub m_0: Token,
+    pub m_first: Box<Parameter>,
+    pub m_rest: Box<Option<ParamListTail>>,
+  }
+  #[derive(Debug)] pub struct Parameter {
+    pub m_sem_attr: Box<Option<ParamSemantic>>,
+    pub m_variable: Token,
+    pub m_2: Token,
+    pub m_type: Box<Option<RuleType>>,
+  }
+  #[derive(Debug)] pub struct ParamSemantic {
+    pub m_0: Token,
+    pub m_semantic_name: Option<Token>,
+    pub m_2: Token,
+  }
+  #[derive(Debug)] pub struct RuleType {
+    pub m_kw_optional: Option<Token>,
+    pub m_kw_token: Option<Token>,
+    pub m_id: Token,
+    pub m_token_content: Option<Token>,
+  }
+  #[derive(Debug)] pub struct TopLevelDefineStatement { pub m_body: Box<TopLevelDefine>, pub m_1: Token, }
+  #[derive(Debug)] pub enum TopLevelDefine {
+    TokenLiteral(Box<TokenLiteral>),
+    DefineTokenTypeStatement(Box<DefineTokenTypeStatement>),
+    DefineIgnoreTokenRuleStatement(Box<DefineIgnoreTokenRuleStatement>),
+    DefineTokenRuleStatement(Box<DefineTokenRuleStatement>),
+    DefineSemanticStatement(Box<DefineSemanticStatement>),
+  }
+  #[derive(Debug)] pub struct DefineTokenTypeStatement {
+    pub m_kw_extract: Option<Token>,
+    pub m_1: Token,
+    pub m_token_type: Token,
+  }
+  #[derive(Debug)] pub struct DefineIgnoreTokenRuleStatement { pub m_0: Token, pub m_value: Box<LiteralOrRegExp>, }
+  #[derive(Debug)] pub struct DefineTokenRuleStatement { pub m_token_type: Token, pub m_value: Box<LiteralOrRegExp>, }
+  #[derive(Debug)] pub enum LiteralOrRegExp {
+    TokenLiteral(Box<TokenLiteral>),
+    TokenRegExp(Box<TokenRegExp>),
+  }
+  #[derive(Debug)] pub struct TokenLiteral { pub m_t: Token, }
+  #[derive(Debug)] pub struct TokenRegExp { pub m_t: Token, }
+  #[derive(Debug)] pub struct DefineSemanticStatement { pub m_0: Token, pub m_id: Token, }
+  #[derive(Debug)] pub enum Expression {
+    ConcatExpression(Box<ConcatExpression>),
+    DictExpression(Box<DictExpression>),
+  }
+  #[derive(Debug)] pub struct ConcatExpression { pub m_first: Token, pub m_rest: Box<Option<ConcatExpressionTail>>, }
+  #[derive(Debug)] pub struct ConcatExpressionTail { pub m_0: Token, pub m_rest: Box<ConcatExpression>, }
+  #[derive(Debug)] pub struct DictExpression {
+    pub m_0: Token,
+    pub m_values: Box<Option<VariableList>>,
+    pub m_2: Token,
+  }
+  #[derive(Debug)] pub struct VariableList { pub m_first: Token, pub m_rest: Box<Option<VariableListTail>>, }
+  #[derive(Debug)] pub struct VariableListTail { pub m_0: Token, pub m_rest: Box<Option<VariableList>>, }
+}
+pub mod pt {
+  use super::*;
+  #[derive(Debug)] pub enum TopLevelStatement<'p> {  DefineRuleStatement(Box<ParseHook<Rule, pt::DefineRuleStatement<'p>>>), TopLevelDefineStatement(Box<pt::TopLevelDefineStatement<'p>>), }
+  #[derive(Debug)] pub struct DefineRuleStatement<'p> {
+    pub ast: &'p ast::DefineRuleStatement,
+    pub m_hook_attr: Box<Option<ParseHook<Hook, pt::HookAttribute<'p>>>>,
     pub m_rule_name: String,
-    pub m_body: Box<ParseHook<RuleValue, PTRuleDefineBody<'p>>>,
-}
-impl<'p> PTDefineRuleStatement<'p> {
-    fn from_ast_internal(ast: &'p ASTDefineRuleStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_hook_attr = if let Some(v) = ast.m_hook_attr_1.as_ref() { Box::new(Some(PTHookAttribute::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        let m_rule_name = ast.m_rule_name_2.value.clone();
-        let m_body = Box::new(PTRuleDefineBody::from_ast(&ast.m_body_3.as_ref(), _si, _errors));
-        Self {
-            ast,
-            m_hook_attr,
-            m_rule_name,
-            m_body,
-        }
-    }
-}
-impl<'p> PTDefineRuleStatement<'p> {
-    #[inline] fn from_ast(ast: &'p ASTDefineRuleStatement, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<Rule, PTDefineRuleStatement<'p>> {
-        let mut pt = Self::from_ast_internal(ast, si, err);
-        ParseHook { val: parse_rule(&mut pt, si, err), pt }
-    }
-}
-// Expression
-regen::impl_union!(from_ast_internal,
-[ASTExpression, 
-    ASTConcatExpression,
-    ASTDictExpression,
-], [PTExpression<'p>, 
-    PTConcatExpression<'p>, PTConcatExpression,
-    PTDictExpression<'p>, PTDictExpression,
-],);
-#[derive(Debug)] pub enum PTExpression<'p> { 
-    PTConcatExpression(Box<PTConcatExpression<'p>>),
-    PTDictExpression(Box<PTDictExpression<'p>>),
-}
-impl<'p> PTExpression<'p> {
-    #[inline] fn from_ast(ast: &'p ASTExpression, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<Expr, PTExpression<'p>> {
-        let mut pt = Self::from_ast_internal(ast, si, err);
-        ParseHook { val: parse_expr(&mut pt, si, err), pt }
-    }
-}
-// VariableList
-#[derive(Debug)]
-pub struct ASTVariableList {
-    pub m_first_0: Token<Tokens>,
-    pub m_rest_1: Box<Option<ASTVariableListTail>>,
-}
-impl ASTVariableList {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m_first_0 = token!(TIdentifier::parse(ts))?;
-        let m_rest_1 = optional!(ts, ASTVariableListTail::parse(ts));
-        Some(Self {
-            m_first_0,
-            m_rest_1: Box::new(m_rest_1),
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        _si.set(&self.m_first_0, Semantics::SVariable);
-        if let Some(m) = self.m_rest_1.as_ref() { m.apply_semantic(_si); }
-    }
-}
-#[derive(Debug)] pub struct PTVariableList<'p> {
-    pub ast: &'p ASTVariableList,
-    pub asts: VecDeque<&'p Token<Tokens>>,
-    pub vals: VecDeque<String>,
-}
-impl<'p> PTVariableList<'p> {
-    fn from_ast(ast: &'p ASTVariableList, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_first = ast.m_first_0.value.clone();
-        let m_rest = if let Some(v) = ast.m_rest_1.as_ref() { Box::new(Some(PTVariableListTail::from_ast(v, _si, _errors))) } else { Box::new(None) };
-        let (mut asts, mut vals) = move_pt_vec_optional!(m_rest);
-        vals.push_front(m_first);
-        asts.push_front(&ast.m_first_0);
-        Self { ast, vals, asts }
-    }
-}
-// TokenLiteral
-#[derive(Debug)]
-pub struct ASTTokenLiteral {
-    pub m_t_0: Token<Tokens>,
-}
-impl ASTTokenLiteral {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m_t_0 = token!(TLiteral::parse(ts))?;
-        Some(Self {
-            m_t_0,
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-    }
-}
-#[derive(Debug)] pub struct PTTokenLiteral<'p> {
-    pub ast: &'p ASTTokenLiteral,
-    pub m_t: String,
-}
-impl<'p> PTTokenLiteral<'p> {
-    fn from_ast(ast: &'p ASTTokenLiteral, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_t = ast.m_t_0.value.clone();
-        Self { ast, m_t }
-    }
-}
-// HookAttribute
-#[derive(Debug)]
-pub struct ASTHookAttribute {
-    pub m___0: Token<Tokens>,
-    pub m_hook_name_1: Token<Tokens>,
-    pub m___2: Token<Tokens>,
-    pub m_hook_type_3: Token<Tokens>,
-    pub m___4: Token<Tokens>,
-}
-impl ASTHookAttribute {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m___0 = token!(TSymbol::"("(ts))?;
-        let m_hook_name_1 = token!(TLiteral::parse(ts))?;
-        let m___2 = token!(TSymbol::":"(ts))?;
-        let m_hook_type_3 = token!(TLiteral::parse(ts))?;
-        let m___4 = token!(TSymbol::")"(ts))?;
-        Some(Self {
-            m___0,
-            m_hook_name_1,
-            m___2,
-            m_hook_type_3,
-            m___4,
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        _si.set(&self.m_hook_name_1, Semantics::SHookName);
-        _si.set(&self.m_hook_type_3, Semantics::SHookType);
-    }
-}
-#[derive(Debug)] pub struct PTHookAttribute<'p> {
-    pub ast: &'p ASTHookAttribute,
+    pub m_body: Box<ParseHook<RuleValue, pt::RuleDefineBody<'p>>>,
+  }
+  #[derive(Debug)] pub struct HookAttribute<'p> {
+    pub ast: &'p ast::HookAttribute,
     pub m_hook_name: String,
     pub m_hook_type: String,
-}
-impl<'p> PTHookAttribute<'p> {
-    fn from_ast_internal(ast: &'p ASTHookAttribute, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_hook_name = ast.m_hook_name_1.value.clone();
-        let m_hook_type = ast.m_hook_type_3.value.clone();
-        Self {
-            ast,
-            m_hook_name,
-            m_hook_type,
-        }
-    }
-}
-impl<'p> PTHookAttribute<'p> {
-    #[inline] fn from_ast(ast: &'p ASTHookAttribute, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<Hook, PTHookAttribute<'p>> {
-        let mut pt = Self::from_ast_internal(ast, si, err);
-        ParseHook { val: parse_hook(&mut pt, si, err), pt }
-    }
-}
-// RuleType
-#[derive(Debug)]
-pub struct ASTRuleType {
-    pub m_kw_optional_0: Option<Token<Tokens>>,
-    pub m_kw_token_1: Option<Token<Tokens>>,
-    pub m_id_2: Token<Tokens>,
-    pub m_token_content_3: Option<Token<Tokens>>,
-}
-impl ASTRuleType {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m_kw_optional_0 = optional!(ts, token!(TKeyword::"optional"(ts)));
-        let m_kw_token_1 = optional!(ts, token!(TKeyword::"token"(ts)));
-        let m_id_2 = token!(TIdentifier::parse(ts))?;
-        let m_token_content_3 = optional!(ts, token!(TLiteral::parse(ts)));
-        Some(Self {
-            m_kw_optional_0,
-            m_kw_token_1,
-            m_id_2,
-            m_token_content_3,
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-    }
-}
-#[derive(Debug)] pub struct PTRuleType<'p> {
-    pub ast: &'p ASTRuleType,
+  }
+  #[derive(Debug)] pub enum RuleDefineBody<'p> {  UnionRuleBody(Box<pt::UnionRuleBody<'p>>), FunctionalRuleBody(Box<pt::FunctionalRuleBody<'p>>), }
+  #[derive(Debug)] pub struct UnionRuleBody<'p> {
+    pub ast: &'p ast::UnionRuleBody,
+    pub asts: VecDeque<&'p Token>,
+    pub vals: VecDeque<String>,
+  }
+  #[derive(Debug)] pub struct UnionRuleList<'p> {
+    pub ast: &'p ast::UnionRuleList,
+    pub asts: VecDeque<&'p Token>,
+    pub vals: VecDeque<String>,
+  }
+  #[derive(Debug)] pub struct UnionRuleListTail<'p> {
+    pub ast: &'p ast::UnionRuleListTail,
+    pub asts: VecDeque<&'p Token>,
+    pub vals: VecDeque<String>,
+  }
+  #[derive(Debug)] pub struct FunctionalRuleBody<'p> {
+    pub ast: &'p ast::FunctionalRuleBody,
+    pub m_params: Box<Option<ParseHook<Vec<Param>, pt::ParamList<'p>>>>,
+    pub m_body: Box<Option<ParseHook<Expr, pt::Expression<'p>>>>,
+  }
+  #[derive(Debug)] pub struct ParamList<'p> {
+    pub ast: &'p ast::ParamList,
+    pub asts: VecDeque<&'p ast::Parameter>,
+    pub vals: VecDeque<ParseHook<Param, pt::Parameter<'p>>>,
+  }
+  #[derive(Debug)] pub struct ParamListTail<'p> {
+    pub ast: &'p ast::ParamListTail,
+    pub asts: VecDeque<&'p ast::Parameter>,
+    pub vals: VecDeque<ParseHook<Param, pt::Parameter<'p>>>,
+  }
+  #[derive(Debug)] pub struct Parameter<'p> {
+    pub ast: &'p ast::Parameter,
+    pub m_sem_attr: Box<Option<pt::ParamSemantic<'p>>>,
+    pub m_variable: String,
+    pub m_type: Box<Option<pt::RuleType<'p>>>,
+  }
+  #[derive(Debug)] pub struct ParamSemantic<'p> { pub ast: &'p ast::ParamSemantic, pub m_semantic_name: Option<String>, }
+  #[derive(Debug)] pub struct RuleType<'p> {
+    pub ast: &'p ast::RuleType,
     pub m_kw_optional: bool,
     pub m_kw_token: bool,
     pub m_id: String,
     pub m_token_content: Option<String>,
-}
-impl<'p> PTRuleType<'p> {
-    fn from_ast(ast: &'p ASTRuleType, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_kw_optional = !ast.m_kw_optional_0.is_none();
-        let m_kw_token = !ast.m_kw_token_1.is_none();
-        let m_id = ast.m_id_2.value.clone();
-        let m_token_content = ast.m_token_content_3.as_ref().map(|t| t.value.clone());
-        Self {
-            ast,
-            m_kw_optional,
-            m_kw_token,
-            m_id,
-            m_token_content,
-        }
-    }
-}
-// ConcatExpressionTail
-#[derive(Debug)]
-pub struct ASTConcatExpressionTail {
-    pub m___0: Token<Tokens>,
-    pub m_rest_1: Box<ASTConcatExpression>,
-}
-impl ASTConcatExpressionTail {
-    fn parse(ts: &mut TokenStream<Tokens>) -> Option<Self> {
-        let m___0 = token!(TSymbol::"|"(ts))?;
-        let m_rest_1 = ASTConcatExpression::parse(ts)?;
-        Some(Self {
-            m___0,
-            m_rest_1: Box::new(m_rest_1),
-        })
-    }
-    fn apply_semantic(&self, _si: &mut SemInfo) {
-        self.m_rest_1.apply_semantic(_si);
-    }
-}
-#[derive(Debug)] pub struct PTConcatExpressionTail<'p> {
-    pub ast: &'p ASTConcatExpressionTail,
-    pub asts: VecDeque<&'p Token<Tokens>>,
+  }
+  #[derive(Debug)] pub struct TopLevelDefineStatement<'p> { pub ast: &'p ast::TopLevelDefineStatement, pub m_body: Box<pt::TopLevelDefine<'p>>, }
+  #[derive(Debug)] pub enum TopLevelDefine<'p> { 
+    TokenLiteral(Box<pt::TokenLiteral<'p>>),
+    DefineTokenTypeStatement(Box<ParseHook<TokenDef, pt::DefineTokenTypeStatement<'p>>>),
+    DefineIgnoreTokenRuleStatement(Box<ParseHook<TokenRule, pt::DefineIgnoreTokenRuleStatement<'p>>>),
+    DefineTokenRuleStatement(Box<ParseHook<TokenRule, pt::DefineTokenRuleStatement<'p>>>),
+    DefineSemanticStatement(Box<ParseHook<String, pt::DefineSemanticStatement<'p>>>),
+  }
+  #[derive(Debug)] pub struct DefineTokenTypeStatement<'p> {
+    pub ast: &'p ast::DefineTokenTypeStatement,
+    pub m_kw_extract: bool,
+    pub m_token_type: String,
+  }
+  #[derive(Debug)] pub struct DefineIgnoreTokenRuleStatement<'p> { pub ast: &'p ast::DefineIgnoreTokenRuleStatement, pub m_value: Box<pt::LiteralOrRegExp<'p>>, }
+  #[derive(Debug)] pub struct DefineTokenRuleStatement<'p> {
+    pub ast: &'p ast::DefineTokenRuleStatement,
+    pub m_token_type: String,
+    pub m_value: Box<pt::LiteralOrRegExp<'p>>,
+  }
+  #[derive(Debug)] pub enum LiteralOrRegExp<'p> {  TokenLiteral(Box<pt::TokenLiteral<'p>>), TokenRegExp(Box<pt::TokenRegExp<'p>>), }
+  #[derive(Debug)] pub struct TokenLiteral<'p> { pub ast: &'p ast::TokenLiteral, pub m_t: String, }
+  #[derive(Debug)] pub struct TokenRegExp<'p> { pub ast: &'p ast::TokenRegExp, pub m_t: String, }
+  #[derive(Debug)] pub struct DefineSemanticStatement<'p> { pub ast: &'p ast::DefineSemanticStatement, pub m_id: String, }
+  #[derive(Debug)] pub enum Expression<'p> {  ConcatExpression(Box<pt::ConcatExpression<'p>>), DictExpression(Box<pt::DictExpression<'p>>), }
+  #[derive(Debug)] pub struct ConcatExpression<'p> {
+    pub ast: &'p ast::ConcatExpression,
+    pub asts: VecDeque<&'p Token>,
     pub vals: VecDeque<String>,
+  }
+  #[derive(Debug)] pub struct ConcatExpressionTail<'p> {
+    pub ast: &'p ast::ConcatExpressionTail,
+    pub asts: VecDeque<&'p Token>,
+    pub vals: VecDeque<String>,
+  }
+  #[derive(Debug)] pub struct DictExpression<'p> {
+    pub ast: &'p ast::DictExpression,
+    pub asts: VecDeque<&'p Token>,
+    pub vals: VecDeque<String>,
+  }
+  #[derive(Debug)] pub struct VariableList<'p> {
+    pub ast: &'p ast::VariableList,
+    pub asts: VecDeque<&'p Token>,
+    pub vals: VecDeque<String>,
+  }
+  #[derive(Debug)] pub struct VariableListTail<'p> {
+    pub ast: &'p ast::VariableListTail,
+    pub asts: VecDeque<&'p Token>,
+    pub vals: VecDeque<String>,
+  }
 }
-impl<'p> PTConcatExpressionTail<'p> {
-    fn from_ast(ast: &'p ASTConcatExpressionTail, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
-        let m_rest = Box::new(PTConcatExpression::from_ast(&ast.m_rest_1.as_ref(), _si, _errors));
-        let (asts, vals) = move_pt_vec!(m_rest);
-        Self { ast, vals, asts }
+crate::impl_union!(from_ast, TopLevelStatement, { DefineRuleStatement, TopLevelDefineStatement, });
+impl ast::DefineRuleStatement {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self {
+      m_0: token!(TKeyword::"rule"(ts))?,
+      m_hook_attr: Box::new(optional!(ts, ast::HookAttribute::parse(ts))),
+      m_rule_name: token!(TIdentifier::parse(ts))?,
+      m_body: Box::new(ast::RuleDefineBody::parse(ts)?),
+    })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    if let Some(m) = self.m_hook_attr.as_ref() { m.apply_semantic(_si); }
+    _si.set(&self.m_rule_name, Sem::SRule);
+    self.m_body.apply_semantic(_si);
+  }
+}
+impl<'p> pt::DefineRuleStatement<'p> {
+  fn from_ast_internal(ast: &'p ast::DefineRuleStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_hook_attr = if let Some(v) = ast.m_hook_attr.as_ref() { Box::new(Some(pt::HookAttribute::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    let m_rule_name = ast.m_rule_name.value.clone();
+    let m_body = Box::new(pt::RuleDefineBody::from_ast(&ast.m_body.as_ref(), _si, _errors));
+    Self {
+      ast,
+      m_hook_attr,
+      m_rule_name,
+      m_body,
     }
+  }
+  #[inline] fn from_ast(ast: &'p ast::DefineRuleStatement, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<Rule, pt::DefineRuleStatement<'p>> {
+    let mut pt = Self::from_ast_internal(ast, si, err);
+    ParseHook { val: parse_rule(&mut pt, si, err), pt }
+  }
+}
+impl ast::HookAttribute {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self {
+      m_0: token!(TSymbol::"("(ts))?,
+      m_hook_name: token!(TLiteral::parse(ts))?,
+      m_2: token!(TSymbol::":"(ts))?,
+      m_hook_type: token!(TLiteral::parse(ts))?,
+      m_4: token!(TSymbol::")"(ts))?,
+    })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    _si.set(&self.m_hook_name, Sem::SHookName);
+    _si.set(&self.m_hook_type, Sem::SHookType);
+  }
+}
+impl<'p> pt::HookAttribute<'p> {
+  fn from_ast_internal(ast: &'p ast::HookAttribute, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_hook_name = ast.m_hook_name.value.clone();
+    let m_hook_type = ast.m_hook_type.value.clone();
+    Self { ast, m_hook_name, m_hook_type, }
+  }
+  #[inline] fn from_ast(ast: &'p ast::HookAttribute, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<Hook, pt::HookAttribute<'p>> {
+    let mut pt = Self::from_ast_internal(ast, si, err);
+    ParseHook { val: parse_hook(&mut pt, si, err), pt }
+  }
+}
+crate::impl_union!(from_ast_internal, RuleDefineBody, { UnionRuleBody, FunctionalRuleBody, });
+impl<'p> pt::RuleDefineBody<'p> {
+  #[inline] fn from_ast(ast: &'p ast::RuleDefineBody, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<RuleValue, pt::RuleDefineBody<'p>> {
+    let mut pt = Self::from_ast_internal(ast, si, err);
+    ParseHook { val: parse_rule_value(&mut pt, si, err), pt }
+  }
+}
+impl ast::UnionRuleBody {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self {
+      m_0: token!(TSymbol::"="(ts))?,
+      m_rules: Box::new(optional!(ts, ast::UnionRuleList::parse(ts))),
+      m_2: token!(TSymbol::";"(ts))?,
+    })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    if let Some(m) = self.m_rules.as_ref() { m.apply_semantic(_si); }
+  }
+}
+impl<'p> pt::UnionRuleBody<'p> {
+  fn from_ast(ast: &'p ast::UnionRuleBody, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_rules = if let Some(v) = ast.m_rules.as_ref() { Box::new(Some(pt::UnionRuleList::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    let (asts, vals) = move_pt_vec_optional!(m_rules);
+    Self { ast, asts, vals }
+  }
+}
+impl ast::UnionRuleList {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self { m_first: token!(TIdentifier::parse(ts))?, m_rest: Box::new(optional!(ts, ast::UnionRuleListTail::parse(ts))), })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    _si.set(&self.m_first, Sem::SRule);
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  }
+}
+impl<'p> pt::UnionRuleList<'p> {
+  fn from_ast(ast: &'p ast::UnionRuleList, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_first = ast.m_first.value.clone();
+    let m_rest = if let Some(v) = ast.m_rest.as_ref() { Box::new(Some(pt::UnionRuleListTail::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    let (mut asts, mut vals) = move_pt_vec_optional!(m_rest);
+    vals.push_front(m_first);
+    asts.push_front(&ast.m_first);
+    Self { ast, asts, vals }
+  }
+}
+impl ast::UnionRuleListTail {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self {
+      m_0: token!(TSymbol::"|"(ts))?,
+      m_first: token!(TIdentifier::parse(ts))?,
+      m_rest: Box::new(optional!(ts, ast::UnionRuleListTail::parse(ts))),
+    })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    _si.set(&self.m_first, Sem::SRule);
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  }
+}
+impl<'p> pt::UnionRuleListTail<'p> {
+  fn from_ast(ast: &'p ast::UnionRuleListTail, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_first = ast.m_first.value.clone();
+    let m_rest = if let Some(v) = ast.m_rest.as_ref() { Box::new(Some(pt::UnionRuleListTail::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    let (mut asts, mut vals) = move_pt_vec_optional!(m_rest);
+    vals.push_front(m_first);
+    asts.push_front(&ast.m_first);
+    Self { ast, asts, vals }
+  }
+}
+impl ast::FunctionalRuleBody {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self {
+      m_0: token!(TSymbol::"("(ts))?,
+      m_params: Box::new(optional!(ts, ast::ParamList::parse(ts))),
+      m_2: token!(TSymbol::")"(ts))?,
+      m_body: Box::new(optional!(ts, ast::Expression::parse(ts))),
+      m_4: token!(TSymbol::";"(ts))?,
+    })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    if let Some(m) = self.m_params.as_ref() { m.apply_semantic(_si); }
+    if let Some(m) = self.m_body.as_ref() { m.apply_semantic(_si); }
+  }
+}
+impl<'p> pt::FunctionalRuleBody<'p> {
+  fn from_ast(ast: &'p ast::FunctionalRuleBody, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_params = if let Some(v) = ast.m_params.as_ref() { Box::new(Some(pt::ParamList::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    let m_body = if let Some(v) = ast.m_body.as_ref() { Box::new(Some(pt::Expression::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    Self { ast, m_params, m_body, }
+  }
+}
+impl ast::ParamList {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self { m_first: Box::new(ast::Parameter::parse(ts)?), m_rest: Box::new(optional!(ts, ast::ParamListTail::parse(ts))), })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    self.m_first.apply_semantic(_si);
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  }
+}
+impl<'p> pt::ParamList<'p> {
+  fn from_ast_internal(ast: &'p ast::ParamList, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_first = Box::new(pt::Parameter::from_ast(&ast.m_first.as_ref(), _si, _errors));
+    let m_rest = if let Some(v) = ast.m_rest.as_ref() { Box::new(Some(pt::ParamListTail::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    let (mut asts, mut vals) = move_pt_vec_optional!(m_rest);
+    vals.push_front(*m_first);
+    asts.push_front(&ast.m_first);
+    Self { ast, asts, vals }
+  }
+  #[inline] fn from_ast(ast: &'p ast::ParamList, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<Vec<Param>, pt::ParamList<'p>> {
+    let mut pt = Self::from_ast_internal(ast, si, err);
+    ParseHook { val: parse_param_list(&mut pt, si, err), pt }
+  }
+}
+impl ast::ParamListTail {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self {
+      m_0: token!(TSymbol::","(ts))?,
+      m_first: Box::new(ast::Parameter::parse(ts)?),
+      m_rest: Box::new(optional!(ts, ast::ParamListTail::parse(ts))),
+    })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    self.m_first.apply_semantic(_si);
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  }
+}
+impl<'p> pt::ParamListTail<'p> {
+  fn from_ast(ast: &'p ast::ParamListTail, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_first = Box::new(pt::Parameter::from_ast(&ast.m_first.as_ref(), _si, _errors));
+    let m_rest = if let Some(v) = ast.m_rest.as_ref() { Box::new(Some(pt::ParamListTail::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    let (mut asts, mut vals) = move_pt_vec_optional!(m_rest);
+    vals.push_front(*m_first);
+    asts.push_front(&ast.m_first);
+    Self { ast, asts, vals }
+  }
+}
+impl ast::Parameter {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self {
+      m_sem_attr: Box::new(optional!(ts, ast::ParamSemantic::parse(ts))),
+      m_variable: token!(TIdentifier::parse(ts))?,
+      m_2: token!(TSymbol::":"(ts))?,
+      m_type: Box::new(optional!(ts, ast::RuleType::parse(ts))),
+    })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    if let Some(m) = self.m_sem_attr.as_ref() { m.apply_semantic(_si); }
+    _si.set(&self.m_variable, Sem::SVariable);
+    if let Some(m) = self.m_type.as_ref() { m.apply_semantic(_si); }
+  }
+}
+impl<'p> pt::Parameter<'p> {
+  fn from_ast_internal(ast: &'p ast::Parameter, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_sem_attr = if let Some(v) = ast.m_sem_attr.as_ref() { Box::new(Some(pt::ParamSemantic::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    let m_variable = ast.m_variable.value.clone();
+    let m_type = if let Some(v) = ast.m_type.as_ref() { Box::new(Some(pt::RuleType::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    Self {
+      ast,
+      m_sem_attr,
+      m_variable,
+      m_type,
+    }
+  }
+  #[inline] fn from_ast(ast: &'p ast::Parameter, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<Param, pt::Parameter<'p>> {
+    let mut pt = Self::from_ast_internal(ast, si, err);
+    ParseHook { val: parse_param(&mut pt, si, err), pt }
+  }
+}
+impl ast::ParamSemantic {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self {
+      m_0: token!(TSymbol::"("(ts))?,
+      m_semantic_name: optional!(ts, token!(TIdentifier::parse(ts))),
+      m_2: token!(TSymbol::")"(ts))?,
+    })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    if let Some(m) = &self.m_semantic_name { _si.set(m, Sem::SSemantic); }
+  }
+}
+impl<'p> pt::ParamSemantic<'p> {
+  fn from_ast(ast: &'p ast::ParamSemantic, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_semantic_name = ast.m_semantic_name.as_ref().map(|t| t.value.clone());
+    Self { ast, m_semantic_name }
+  }
+}
+impl ast::RuleType {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self {
+      m_kw_optional: optional!(ts, token!(TKeyword::"optional"(ts))),
+      m_kw_token: optional!(ts, token!(TKeyword::"token"(ts))),
+      m_id: token!(TIdentifier::parse(ts))?,
+      m_token_content: optional!(ts, token!(TLiteral::parse(ts))),
+    })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+  }
+}
+impl<'p> pt::RuleType<'p> {
+  fn from_ast(ast: &'p ast::RuleType, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_kw_optional = !ast.m_kw_optional.is_none();
+    let m_kw_token = !ast.m_kw_token.is_none();
+    let m_id = ast.m_id.value.clone();
+    let m_token_content = ast.m_token_content.as_ref().map(|t| t.value.clone());
+    Self {
+      ast,
+      m_kw_optional,
+      m_kw_token,
+      m_id,
+      m_token_content,
+    }
+  }
+}
+impl ast::TopLevelDefineStatement {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self { m_body: Box::new(ast::TopLevelDefine::parse(ts)?), m_1: token!(TSymbol::";"(ts))?, })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    self.m_body.apply_semantic(_si);
+  }
+}
+impl<'p> pt::TopLevelDefineStatement<'p> {
+  fn from_ast(ast: &'p ast::TopLevelDefineStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_body = Box::new(pt::TopLevelDefine::from_ast(&ast.m_body.as_ref(), _si, _errors));
+    Self { ast, m_body }
+  }
+}
+crate::impl_union!(from_ast, TopLevelDefine, {
+  TokenLiteral,
+  DefineTokenTypeStatement,
+  DefineIgnoreTokenRuleStatement,
+  DefineTokenRuleStatement,
+  DefineSemanticStatement,
+});
+impl ast::DefineTokenTypeStatement {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self {
+      m_kw_extract: optional!(ts, token!(TKeyword::"extract"(ts))),
+      m_1: token!(TKeyword::"token"(ts))?,
+      m_token_type: token!(TIdentifier::parse(ts))?,
+    })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    _si.set(&self.m_token_type, Sem::SToken);
+  }
+}
+impl<'p> pt::DefineTokenTypeStatement<'p> {
+  fn from_ast_internal(ast: &'p ast::DefineTokenTypeStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_kw_extract = !ast.m_kw_extract.is_none();
+    let m_token_type = ast.m_token_type.value.clone();
+    Self { ast, m_kw_extract, m_token_type, }
+  }
+  #[inline] fn from_ast(ast: &'p ast::DefineTokenTypeStatement, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<TokenDef, pt::DefineTokenTypeStatement<'p>> {
+    let mut pt = Self::from_ast_internal(ast, si, err);
+    ParseHook { val: parse_token_def(&mut pt, si, err), pt }
+  }
+}
+impl ast::DefineIgnoreTokenRuleStatement {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self { m_0: token!(TKeyword::"ignore"(ts))?, m_value: Box::new(ast::LiteralOrRegExp::parse(ts)?), })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    self.m_value.apply_semantic(_si);
+  }
+}
+impl<'p> pt::DefineIgnoreTokenRuleStatement<'p> {
+  fn from_ast_internal(ast: &'p ast::DefineIgnoreTokenRuleStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_value = Box::new(pt::LiteralOrRegExp::from_ast(&ast.m_value.as_ref(), _si, _errors));
+    Self { ast, m_value }
+  }
+  #[inline] fn from_ast(ast: &'p ast::DefineIgnoreTokenRuleStatement, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<TokenRule, pt::DefineIgnoreTokenRuleStatement<'p>> {
+    let mut pt = Self::from_ast_internal(ast, si, err);
+    ParseHook { val: parse_token_ignore_rule(&mut pt, si, err), pt }
+  }
+}
+impl ast::DefineTokenRuleStatement {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self { m_token_type: token!(TIdentifier::parse(ts))?, m_value: Box::new(ast::LiteralOrRegExp::parse(ts)?), })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    _si.set(&self.m_token_type, Sem::SToken);
+    self.m_value.apply_semantic(_si);
+  }
+}
+impl<'p> pt::DefineTokenRuleStatement<'p> {
+  fn from_ast_internal(ast: &'p ast::DefineTokenRuleStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_token_type = ast.m_token_type.value.clone();
+    let m_value = Box::new(pt::LiteralOrRegExp::from_ast(&ast.m_value.as_ref(), _si, _errors));
+    Self { ast, m_token_type, m_value, }
+  }
+  #[inline] fn from_ast(ast: &'p ast::DefineTokenRuleStatement, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<TokenRule, pt::DefineTokenRuleStatement<'p>> {
+    let mut pt = Self::from_ast_internal(ast, si, err);
+    ParseHook { val: parse_token_rule(&mut pt, si, err), pt }
+  }
+}
+crate::impl_union!(from_ast, LiteralOrRegExp, { TokenLiteral, TokenRegExp, });
+impl ast::TokenLiteral {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self { m_t: token!(TLiteral::parse(ts))?, })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+  }
+}
+impl<'p> pt::TokenLiteral<'p> {
+  fn from_ast(ast: &'p ast::TokenLiteral, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_t = ast.m_t.value.clone();
+    Self { ast, m_t }
+  }
+}
+impl ast::TokenRegExp {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self { m_t: token!(TRegExp::parse(ts))?, })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+  }
+}
+impl<'p> pt::TokenRegExp<'p> {
+  fn from_ast(ast: &'p ast::TokenRegExp, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_t = ast.m_t.value.clone();
+    Self { ast, m_t }
+  }
+}
+impl ast::DefineSemanticStatement {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self { m_0: token!(TKeyword::"semantic"(ts))?, m_id: token!(TIdentifier::parse(ts))?, })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    _si.set(&self.m_id, Sem::SSemantic);
+  }
+}
+impl<'p> pt::DefineSemanticStatement<'p> {
+  fn from_ast_internal(ast: &'p ast::DefineSemanticStatement, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_id = ast.m_id.value.clone();
+    Self { ast, m_id }
+  }
+  #[inline] fn from_ast(ast: &'p ast::DefineSemanticStatement, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<String, pt::DefineSemanticStatement<'p>> {
+    let mut pt = Self::from_ast_internal(ast, si, err);
+    ParseHook { val: parse_semantic(&mut pt, si, err), pt }
+  }
+}
+crate::impl_union!(from_ast_internal, Expression, { ConcatExpression, DictExpression, });
+impl<'p> pt::Expression<'p> {
+  #[inline] fn from_ast(ast: &'p ast::Expression, si: &mut SemInfo, err: &mut Vec<Error>) -> ParseHook<Expr, pt::Expression<'p>> {
+    let mut pt = Self::from_ast_internal(ast, si, err);
+    ParseHook { val: parse_expr(&mut pt, si, err), pt }
+  }
+}
+impl ast::ConcatExpression {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self { m_first: token!(TIdentifier::parse(ts))?, m_rest: Box::new(optional!(ts, ast::ConcatExpressionTail::parse(ts))), })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    _si.set(&self.m_first, Sem::SVariable);
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  }
+}
+impl<'p> pt::ConcatExpression<'p> {
+  fn from_ast(ast: &'p ast::ConcatExpression, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_first = ast.m_first.value.clone();
+    let m_rest = if let Some(v) = ast.m_rest.as_ref() { Box::new(Some(pt::ConcatExpressionTail::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    let (mut asts, mut vals) = move_pt_vec_optional!(m_rest);
+    vals.push_front(m_first);
+    asts.push_front(&ast.m_first);
+    Self { ast, asts, vals }
+  }
+}
+impl ast::ConcatExpressionTail {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self { m_0: token!(TSymbol::"|"(ts))?, m_rest: Box::new(ast::ConcatExpression::parse(ts)?), })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    self.m_rest.apply_semantic(_si);
+  }
+}
+impl<'p> pt::ConcatExpressionTail<'p> {
+  fn from_ast(ast: &'p ast::ConcatExpressionTail, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_rest = Box::new(pt::ConcatExpression::from_ast(&ast.m_rest.as_ref(), _si, _errors));
+    let (asts, vals) = move_pt_vec!(m_rest);
+    Self { ast, asts, vals }
+  }
+}
+impl ast::DictExpression {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self {
+      m_0: token!(TSymbol::"{"(ts))?,
+      m_values: Box::new(optional!(ts, ast::VariableList::parse(ts))),
+      m_2: token!(TSymbol::"}"(ts))?,
+    })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    if let Some(m) = self.m_values.as_ref() { m.apply_semantic(_si); }
+  }
+}
+impl<'p> pt::DictExpression<'p> {
+  fn from_ast(ast: &'p ast::DictExpression, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_values = if let Some(v) = ast.m_values.as_ref() { Box::new(Some(pt::VariableList::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    let (asts, vals) = move_pt_vec_optional!(m_values);
+    Self { ast, asts, vals }
+  }
+}
+impl ast::VariableList {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self { m_first: token!(TIdentifier::parse(ts))?, m_rest: Box::new(optional!(ts, ast::VariableListTail::parse(ts))), })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    _si.set(&self.m_first, Sem::SVariable);
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  }
+}
+impl<'p> pt::VariableList<'p> {
+  fn from_ast(ast: &'p ast::VariableList, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_first = ast.m_first.value.clone();
+    let m_rest = if let Some(v) = ast.m_rest.as_ref() { Box::new(Some(pt::VariableListTail::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    let (mut asts, mut vals) = move_pt_vec_optional!(m_rest);
+    vals.push_front(m_first);
+    asts.push_front(&ast.m_first);
+    Self { ast, asts, vals }
+  }
+}
+impl ast::VariableListTail {
+  fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
+    Some(Self { m_0: token!(TSymbol::","(ts))?, m_rest: Box::new(optional!(ts, ast::VariableList::parse(ts))), })
+  }
+  fn apply_semantic(&self, _si: &mut SemInfo) {
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  }
+}
+impl<'p> pt::VariableListTail<'p> {
+  fn from_ast(ast: &'p ast::VariableListTail, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {
+    let m_rest = if let Some(v) = ast.m_rest.as_ref() { Box::new(Some(pt::VariableList::from_ast(v, _si, _errors))) } else { Box::new(None) };
+    let (asts, vals) = move_pt_vec_optional!(m_rest);
+    Self { ast, asts, vals }
+  }
 }

@@ -1,151 +1,132 @@
-// #[macro_use]
-// extern crate macro_pub;
-
-use clap::ArgMatches;
-use clap::{Command, Arg};
-
+use clap::{Parser, ValueEnum};
 use regen::emit;
-
-
+use regen::sdk::{
+  generated::{Ctx, Env},
+  EnvMode,
+};
 use std::fs;
+use std::path::PathBuf;
 
-fn arg_output() -> Arg {
-    Arg::new("OUTPUT")
-        .short('o')
-        .long("output")
-        .help("The output file name. Prints to console by default.")
-        .action(clap::ArgAction::Set)
-        .num_args(1)
-        .default_value("")
+/// Command line interface
+#[derive(Parser)]
+#[command(
+    bin_name = "regen",
+    about,
+    long_about = None,
+    version,
+    author,
+    subcommand_required = true,
+    arg_required_else_help = true
+)]
+enum Cli {
+  /// Highlight the input grammar file and generate HTML for the highlighted code
+  ///
+  /// This command will highlight the input Regen grammar file and
+  /// emit the code in HTML format. A template HTML file can be provided with
+  /// comment tags `<!-- INCLUDE_REGEN_TOKENIZE -->`, `<!-- INCLUDE_REGEN_AST_SEMANTIC -->` and `<!-- INCLUDE_REGEN_FULL_SEMANTIC -->`
+  /// which will be replaced with the code highlighted with different levels of semantic information.
+  Html {
+    #[arg(required = true)]
+    /// The input grammar file name.
+    input: String,
+    #[arg(short = 'o', long = "output", default_value = "")]
+    /// The output file name. Prints to console if empty.
+    output: String,
+    #[arg(short = 's', long = "stack", default_value = "2048")]
+    /// The token stream stack size.
+    stack_size: usize,
+    #[arg(short = 't', long = "template", default_value = "")]
+    /// File name for the template html file to inject the output.
+    template: String,
+  },
+  /// Generate a SDK file for parsing the language specified by the Regen grammar file.
+  Sdk {
+    #[arg(required = true)]
+    /// The input grammar file name.
+    input: String,
+    #[arg(short = 'o', long = "output", default_value = "")]
+    /// The output file name. Prints to console if empty.
+    output: String,
+    #[arg(short = 's', long = "stack", default_value = "2048")]
+    /// The token stream stack size.
+    stack_size: usize,
+    #[arg(short = 't', long = "target", default_value = "rust")]
+    /// The target language to generate the SDK for.
+    target: SdkTarget,
+  },
+}
+#[derive(ValueEnum, Clone)]
+enum SdkTarget {
+  Rust,
+  RustSelf,
 }
 
-fn arg_stack() -> Arg {
-    Arg::new("STACK")
-        .short('s')
-        .long("stack")
-        .help("The token stream stack size.")
-        .value_parser(clap::value_parser!(usize))
-        .action(clap::ArgAction::Set)
-        .num_args(1)
-        .default_value("2048")
-}
-
-fn arg_input() -> Arg {
-    Arg::new("INPUT")
-        .help("The input grammar file name.")
-        .action(clap::ArgAction::Set)
-        .num_args(1)
-        .required(true)
-}
-
-fn arg_template() -> Arg {
-    Arg::new("TEMPLATE")
-        .short('t')
-        .long("template")
-        .help("File name for the context file, which is interleaved with the output.")
-        .action(clap::ArgAction::Set)
-        .num_args(1)
-        .default_value("")
-}
-
-fn read_input(matches: &ArgMatches) -> String {
-    let input = matches.get_one::<String>("INPUT").unwrap();
-    return fs::read_to_string(input).unwrap();
-}
-
-fn write_output(content: &str, matches: &ArgMatches) {
-    let output = matches.get_one::<String>("OUTPUT").unwrap();
-    // let header = matches.get_one::<String>("HEADER").unwrap();
-    // let footer = matches.get_one::<String>("FOOTER").unwrap();
-    // let mut buf = String::new();
-    // if !header.is_empty() {
-    //     buf.push_str(&fs::read_to_string(header).unwrap());
-    // }
-    // buf.push_str(content);
-    // if !footer.is_empty() {
-    //     buf.push_str(&fs::read_to_string(footer).unwrap());
-    // }
-    if output.is_empty() {
-        println!("{}", content);
-    } else {
-        fs::write(output, content).unwrap()
-    }
-}
-
-fn main() -> Result<(), &'static str> {
-   
-
-    let matches = Command::new("regen-lang")
-        .bin_name("regen")
-        .about("hello world regen")
-        .version("0.0.1")
-        .author("iTNTPiston")
-        .subcommand_required(true)
-        .arg_required_else_help(true)
-        .subcommand(
-            Command::new("sdk")
-                .about("Generate a language SDK based on the input grammar file")
-                .arg(arg_input())
-                .arg(arg_output())
-                .arg(arg_stack())
-                .arg(
-                    Arg::new("TARGET")
-                        .short('T')
-                        .long("target")
-                        .help("The target language.")
-                        .action(clap::ArgAction::Set)
-                        .value_parser(["rs", "ts", "py"])
-                        .num_args(1)
-                        .default_value("rs")
-                )
-        )
-        .subcommand(
-            Command::new("html")
-                .about("Highlight the input grammar file and generate HTML for the highlighted code")
-                .arg(arg_input())
-                .arg(arg_output())
-                .arg(arg_stack())
-                .arg(arg_template())
-        );
-        
-
-    match matches.get_matches().subcommand() {
-        Some(("sdk", matches)) => {
-            emit_self()
-        },
-        Some(("html", matches)) => {
-            let source = read_input(matches);
-            let stack_size = matches.get_one::<usize>("STACK").unwrap();
-            let template = matches.get_one::<String>("TEMPLATE").unwrap();
-            let template_html = if template.is_empty() {
-                String::from(include_str!("./emit/default.html"))
-            } else {
-                fs::read_to_string(template).unwrap()
-            };
-            let (output, errors) = emit::emit_html(&template_html, &source, *stack_size);
-            write_output(&output, matches);
-            if !errors.is_empty() {
-                for e in errors {
-                    eprintln!("{}", &e.pretty(&source, 1).unwrap());
-                }
-                return Err("Errors found when parsing the  file.");
-            }
-        },
-        _ => {}
-    }
-        
+fn write_output(contents: &str, location: &str) -> Result<(), std::io::Error> {
+  if location.is_empty() {
+    println!("{}", contents);
     Ok(())
+  } else {
+    fs::write(location, contents)
+  }
+}
 
-    // let args: Vec<String> = env::args().collect();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+  // emit_self();
+  // return Ok(());
+  let (errors, source) = match Cli::parse() {
+    Cli::Html {
+      input,
+      output,
+      stack_size,
+      template,
+    } => {
+      let source = fs::read_to_string(input)?;
+      let template_html = if template.is_empty() {
+        String::from(include_str!("./emit/default.html"))
+      } else {
+        fs::read_to_string(template).unwrap()
+      };
+      let mut env = Env::new(&source, EnvMode::All, stack_size);
+      let generated_code = emit::emit_html(&mut env, &template_html, emit::to_prismjs);
+      write_output(&generated_code, &output)?;
+      let ctx: Ctx = env.into();
+      (ctx.err, source)
+    }
+    Cli::Sdk { target, input, output, stack_size } => {
+      let path = PathBuf::from(&input);
+      let parent_path = path.parent().unwrap();
+      let source = fs::read_to_string(input)?;
+      let mut env = Env::new(&source, EnvMode::All, stack_size);
 
-    // if args.len() == 1 {
-    //     emit_self()
-    // } else {
-    //     test()
-    // }
+      let emitter = match target {
+        SdkTarget::Rust => emit::RustEmitter::new(false, 2, parent_path.to_path_buf()),
+        SdkTarget::RustSelf => emit::RustEmitter::new(true, 2, parent_path.to_path_buf()),
+      };
+
+      match emit::emit_sdk(&mut env, emitter)? {
+        Some(code) => {
+          write_output(&code, &output)?;
+          (vec![], source)
+        },
+        None => {
+          let ctx: Ctx = env.into();
+          (ctx.err, source)
+        }
+      }
+    }
+  };
+
+  if !errors.is_empty() {
+    for e in errors {
+      eprintln!("{}", &e.pretty(&source, 1)?);
+    }
+    return Err("Errors found when parsing the grammar file.".into());
+  }
+
+  Ok(())
 }
 
 fn emit_self() {
-    let mut lang = regen::core::LangDef::make_test();
-    lang.emit_rust();
+  let mut lang = regen::core::LangDef::make_test();
+  lang.emit_rust();
 }

@@ -1,5 +1,7 @@
-// This is the language file to generate the parser for Regen-Lang itself
-"";
+/*
+ This is the language file to generate the parser for Regen-Lang itself
+*/ 
+"src/sdk/generated.rs.pp";
 // Token Types
 
 // Define Tokenizer
@@ -61,7 +63,7 @@ rule TopLevelStatement = DefineRuleStatement | TopLevelDefineStatement;
 rule ("parse_rule":"Rule")
 DefineRuleStatement(
     _: token Keyword"rule",
-    hookAttr: optional HookAttrribute,
+    hookAttr: optional HookAttribute,
     (Rule) ruleName: token Identifier,
     body: RuleDefineBody
 ) {
@@ -69,7 +71,7 @@ DefineRuleStatement(
 };
 
 rule ("parse_hook":"Hook")
-HookAttrribute(
+HookAttribute(
     _: token Symbol"(",
     (HookName) hookName: token Literal,
     _: token Symbol":",
@@ -111,10 +113,10 @@ rule FunctionalRuleBody(
 };
 
 
-rule ("parse_param_list":"Vec<Param>") ParamList(first: Param, rest: optional ParamListTail) first | rest;
-rule ParamListTail(_: token Symbol",", first: Param, rest: optional ParamListTail) first | rest;
+rule ("parse_param_list":"Vec<Param>") ParamList(first: Parameter, rest: optional ParamListTail) first | rest;
+rule ParamListTail(_: token Symbol",", first: Parameter, rest: optional ParamListTail) first | rest;
 
-rule ("parse_param":"Param") Param(
+rule ("parse_param":"Param") Parameter(
     semAttr: optional ParamSemantic,
     (Variable) variable: token Identifier,
     _: token Symbol":",
