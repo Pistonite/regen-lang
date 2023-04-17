@@ -1,4 +1,4 @@
-use crate::sdk::generated::{pt, SemInfo};
+use crate::sdk::grammar::{pt, Ctx};
 use crate::sdk::Error;
 use crate::tree_cast;
 use heck::ToUpperCamelCase;
@@ -41,32 +41,8 @@ impl Rule {
   pub fn struct_name(&self) -> String {
     self.name.to_upper_camel_case()
   }
-  // /// Internal AST type name
-  // pub fn ast_node_name(&self) -> String {
-  //     format!("ast::{}", super::to_camel_case(&self.name, true))
-  // }
-  // /// External Parse Tree node type.
-  // /// If the rule has a hook, this will be the return type of the hook
-  // pub fn pt_type(&self) -> String {
-  //     match &self.hook {
-  //         Some(hook) => format!(
-  //             "ParseHook<{}, {}>",
-  //             hook.return_type,
-  //             &self.pt_internal_type(true)
-  //         ),
-  //         None => self.pt_internal_type(true),
-  //     }
-  // }
-  // /// The internal Parse Tree node type.
-  // /// If the rule has a hook, this will be the type passed to the hook
-  // pub fn pt_internal_type(&self, include_lifetime: bool) -> String {
-  //     let mut t = format!("PT{}", super::to_camel_case(&self.name, true));
-  //     if include_lifetime {
-  //         t.push_str("<'p>")
-  //     }
-  //     t
-  // }
-  fn set_opqaue_ret_type<'s>(&'s self, ret_types: &mut HashMap<String, RetType>) {
+
+  fn set_opqaue_ret_type(&self, ret_types: &mut HashMap<String, RetType>) {
     let t = RetType::Unit(ParamType::Item(false, self.name.clone()));
     ret_types.insert(self.name.clone(), t);
   }
@@ -77,9 +53,9 @@ impl Rule {
   ///
   /// The returned type is either a Param, indicating that the rule returns a single value
   /// or a Vec, indicating that the rule returns a vector of values
-  pub fn resolve_ret_type<'s>(
+  pub fn resolve_ret_type(
     &self,
-    ret_types: &'s mut HashMap<String, RetType>,
+    ret_types: &mut HashMap<String, RetType>,
     rules: &HashMap<String, Rule>,
   ) {
     if let Some(t) = ret_types.get(&self.name) {
@@ -104,11 +80,11 @@ impl Rule {
   }
 
   /// Helper function to resolve the return type of a function rule
-  fn resolve_func_ret_type<'s>(
+  fn resolve_func_ret_type(
     &self,
     params: &Vec<Param>,
     body: &Expr,
-    ret_types: &'s mut HashMap<String, RetType>,
+    ret_types: &mut HashMap<String, RetType>,
     rules: &HashMap<String, Rule>,
   ) {
     // First, resolve the type of all parameters
@@ -128,19 +104,17 @@ impl Rule {
           ret_types.insert(self.name.clone(), RetType::Pending);
           // Recursively resolve referenced rule
           let rule = rules.get(subrule).unwrap();
-          if let Some(t) = ret_types.get(&rule.name) {
-            if let RetType::Pending = t {
-              // We have a pending dependency on this rule, but it is also pending
-              // This means that we have a circular dependency
-              ret_types.insert(
-                self.name.clone(),
-                RetType::Unresolved(format!(
-                  "Infinite recursion detected for rule \"{}\"",
-                  self.name
-                )),
-              );
-              return;
-            }
+          if let Some(RetType::Pending) = ret_types.get(&rule.name) {
+            // We have a pending dependency on this rule, but it is also pending
+            // This means that we have a circular dependency
+            ret_types.insert(
+              self.name.clone(),
+              RetType::Unresolved(format!(
+                "Infinite recursion detected for rule \"{}\"",
+                self.name
+              )),
+            );
+            return;
           }
           let sub_ret_type = {
             rule.resolve_ret_type(ret_types, rules);
@@ -193,12 +167,11 @@ impl Rule {
   }
 
   /// Helper function to resolve the return type of a function rule that returns a concatenation
-  fn resolve_func_concat_ret_type<'s>(
+  fn resolve_func_concat_ret_type(
     &self,
     vars: &Vec<String>,
     param_types: &HashMap<String, ParamType>,
-    //apparent_ret_types: &mut HashMap<String, RetType>,
-    ret_types: &'s mut HashMap<String, RetType>,
+    ret_types: &mut HashMap<String, RetType>,
     rules: &HashMap<String, Rule>,
   ) {
     let name = &self.name;
@@ -299,11 +272,7 @@ impl Rule {
 }
 
 /// Parser hook for Rule
-pub fn parse_rule(
-  pt: &mut pt::DefineRuleStatement,
-  _si: &mut SemInfo,
-  errors: &mut Vec<Error>,
-) -> Option<Rule> {
+pub fn parse_rule(pt: &mut pt::DefineRuleStatement, ctx: &mut Ctx) -> Option<Rule> {
   // Take value which might be unresolved
   let value = match pt.m_body.as_ref().val {
     None => {
@@ -323,7 +292,9 @@ pub fn parse_rule(
         "consider removing \"{name}\" from the union",
         name = &pt.m_rule_name
       );
-      errors.push(Error::from_token(&pt.ast.m_rule_name, msg, help));
+      ctx
+        .err
+        .push(Error::from_token(&pt.ast.m_rule_name, msg, help));
     }
   }
   // Take hook which might be None or unresolved
@@ -344,21 +315,14 @@ pub enum RuleValue {
   Function(Vec<Param>, Expr),
 }
 /// Parser hook for RuleValue
-pub fn parse_rule_value(
-  pt: &mut pt::RuleDefineBody,
-  _si: &mut SemInfo,
-  errors: &mut Vec<Error>,
-) -> Option<RuleValue> {
+pub fn parse_rule_value(pt: &mut pt::RuleDefineBody, ctx: &mut Ctx) -> Option<RuleValue> {
   match pt {
-    pt::RuleDefineBody::UnionRuleBody(pt) => parse_rule_value_union(pt, errors),
-    pt::RuleDefineBody::FunctionalRuleBody(pt) => parse_rule_value_function(pt, errors),
+    pt::RuleDefineBody::UnionRuleBody(pt) => parse_rule_value_union(pt, &mut ctx.err),
+    pt::RuleDefineBody::FunctionalRuleBody(pt) => parse_rule_value_function(pt, &mut ctx.err),
   }
 }
 
-fn parse_rule_value_union(
-  pt: &Box<pt::UnionRuleBody>,
-  errors: &mut Vec<Error>,
-) -> Option<RuleValue> {
+fn parse_rule_value_union(pt: &pt::UnionRuleBody, errors: &mut Vec<Error>) -> Option<RuleValue> {
   // make sure at least one rule exists in the union
   if pt.vals.is_empty() {
     let msg = "Empty union is not allowed.".to_owned();
@@ -369,7 +333,7 @@ fn parse_rule_value_union(
   // There aren't going to be many subrules, so it's fine to use not use a hash set for deduplication
   let mut subrules = Vec::new();
   for (next_rule, token) in pt.vals.iter().zip(pt.asts.iter()) {
-    if subrules.iter().find(|r| r == &next_rule).is_some() {
+    if subrules.iter().any(|r| r == next_rule) {
       let msg = "Duplicate rule in a union".to_owned();
       let help = format!("Remove this duplicated \"{}\"", next_rule);
       errors.push(Error::from_token(token, msg, help));
@@ -405,8 +369,8 @@ fn parse_rule_value_function(
   let body = match pt.m_body.as_mut().as_mut() {
     None => {
       let msg = "Rule must have a body".to_owned();
-      let help = "Add an expression before \";\"".to_owned();
-      errors.push(Error::from_token(&pt.ast.m_4 /*;*/, msg, help));
+      let help = "Add an expression after \")\"".to_owned();
+      errors.push(Error::from_token(&pt.ast.m_2 /*)*/, msg, help));
       None
     }
     Some(body) => {
@@ -429,7 +393,7 @@ fn parse_rule_value_function(
             found = true;
             if !param.is_in_pt() {
               let msg = format!("Variable \"{var}\" is not in the parse tree.");
-              let help = format!("This is a required token that matches an literal, which doesn't give you information. Consider removing it.");
+              let help = "This is a required token that matches an literal, which doesn't give you information. Consider removing it.".to_owned();
               errors.push(Error::from_token(ast, msg, help));
               has_error = true;
             }

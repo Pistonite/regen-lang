@@ -1,5 +1,4 @@
-use crate::sdk::generated::{pt, SemInfo};
-use crate::sdk::Error;
+use crate::sdk::grammar::{pt, Ctx};
 
 /// Definition of a Parser Hook
 ///
@@ -36,11 +35,7 @@ pub struct Hook {
   pub return_type: String,
 }
 
-pub fn parse_hook(
-  pt: &pt::HookAttribute,
-  _si: &mut SemInfo,
-  _errors: &mut Vec<Error>,
-) -> Option<Hook> {
+pub fn parse_hook(pt: &pt::HookAttribute, _: &mut Ctx) -> Option<Hook> {
   Some(Hook {
     name: super::strip_quotes(&pt.m_hook_name),
     return_type: super::strip_quotes(&pt.m_hook_type),

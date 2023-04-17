@@ -1,4 +1,4 @@
-use crate::sdk::generated::{Sem, Tok};
+use crate::sdk::grammar::{Sem, Tok};
 use crate::sdk::{Environment, RootParser, Semantic};
 
 const TAG_TOKENIZE: &str = "<!-- INCLUDE_REGEN_TOKENIZE -->";
@@ -30,7 +30,7 @@ where
   // Here, it won't regenerate the AST. It will use the AST we created above
   // After PT is created, it is transfered to the consumer function where you can transform it
   // into the application object. Here we are just ignoring it, as we only need the semantic info.
-  let _ = env.parse_pts_then(|_| Ok(()));
+  let _ = env.parse_pts_then(|_, _| Ok(()));
 
   let full_html = env.as_ctx().si.get_html(&semantic_mapping);
 
@@ -57,6 +57,7 @@ pub fn to_prismjs(s: &Sem) -> String {
     Sem::SSemantic => "token tag".to_owned(),
     Sem::SHookName => "token function".to_owned(),
     Sem::SHookType => "token regex".to_owned(),
+    Sem::SContextType => "token tag".to_owned(),
     _ => s.to_html_class(),
   }
 }

@@ -80,7 +80,7 @@ impl<'t, T> TokenStream<'t, T> {
     match self.tokens.get(self.index) {
       Some(token) => {
         self.index += 1;
-        Some(&token)
+        Some(token)
       }
       None => None,
     }

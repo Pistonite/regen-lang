@@ -11,6 +11,8 @@ pub use rule::{ParamType, RetType, Rule, RuleValue};
 pub mod semantic;
 pub mod token;
 pub use token::{TokenDef, TokenRule};
+pub mod ctx;
+pub use ctx::Context;
 
 pub fn strip_quotes(s: &str) -> String {
   if !s.starts_with('"') || !s.ends_with('"') {

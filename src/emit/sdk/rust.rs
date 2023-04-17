@@ -249,7 +249,7 @@ impl RustEmitter {
       let start = format!("#[derive(Debug)] pub struct {ast_t} {{");
       let mut body = Vec::new();
       for (param, member) in params.iter().zip(member_names.iter()) {
-        let param_t = self.ast_param_type(&param);
+        let param_t = self.ast_param_type(param);
         body.push(Code::Line(format!("pub {member}: {param_t},")));
       }
       let end = "}".to_owned();
@@ -275,7 +275,7 @@ impl RustEmitter {
     self.main_block.push(impl_block);
   }
 
-  fn get_ast_func_parse(&mut self, params: &Vec<Param>, member_names: &Vec<String>) -> Code {
+  fn get_ast_func_parse(&mut self, params: &[Param], member_names: &[String]) -> Code {
     let func_start = "fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {".to_owned();
     let self_start = "Some(Self {".to_owned();
 
@@ -285,7 +285,7 @@ impl RustEmitter {
     for (param, member) in params.iter().zip(member_names.iter()) {
       let type_name = &param.type_name;
       let mut t = if !param.is_token {
-        let t = self.ast(&type_name, false);
+        let t = self.ast(type_name, false);
         format!("ast::{t}::parse(ts)")
       } else {
         let mut t = self.token_name(type_name);
@@ -331,7 +331,7 @@ impl RustEmitter {
       end: "}".to_owned(),
     }
   }
-  fn get_ast_func_apply_semantic(&self, params: &Vec<Param>, member_names: Vec<String>) -> Code {
+  fn get_ast_func_apply_semantic(&self, params: &[Param], member_names: Vec<String>) -> Code {
     let start = "fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {".to_owned();
     let end = "}".to_owned();
     let mut body = Vec::new();
@@ -495,7 +495,7 @@ impl RustEmitter {
 
     let parse_block = {
       let func_name = self.pt_parse_func_name(rule);
-      let start = format!("fn {func_name}(ast: &'p {ast_ns_t}, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {{");
+      let start = format!("fn {func_name}(ast: &'p {ast_ns_t}, _ctx: &mut Ctx) -> Self {{");
       let mut body = vec![];
       let vars = body_expr.get_vars();
 
@@ -508,9 +508,9 @@ impl RustEmitter {
           ParamType::Item(optional, name) => {
             let pt_ns_t = self.pt_inner_type(name, true);
             if *optional {
-              format!("let {member} = if let Some(v) = ast.{member}.as_ref() {{ Box::new(Some({pt_ns_t}::from_ast(v, _si, _errors))) }} else {{ Box::new(None) }};")
+              format!("let {member} = if let Some(v) = ast.{member}.as_ref() {{ Box::new(Some({pt_ns_t}::from_ast(v, _ctx))) }} else {{ Box::new(None) }};")
             } else {
-              format!("let {member} = Box::new({pt_ns_t}::from_ast(&ast.{member}.as_ref(), _si, _errors));")
+              format!("let {member} = Box::new({pt_ns_t}::from_ast(ast.{member}.as_ref(), _ctx));")
             }
           }
           ParamType::String(optional) => {
@@ -521,7 +521,7 @@ impl RustEmitter {
             }
           }
           ParamType::Bool => {
-            format!("let {member} = !ast.{member}.is_none();")
+            format!("let {member} = ast.{member}.is_some();")
           }
         };
         body.push(Code::Line(l));
@@ -648,7 +648,7 @@ impl RustEmitter {
     self.main_block.push(impl_block);
   }
 
-  fn emit_pt_union(&mut self, lang: &Language, rule: &Rule, type_defs: &Vec<String>) {
+  fn emit_pt_union(&mut self, lang: &Language, rule: &Rule, type_defs: &[String]) {
     let (enum_discriminants, impl_block) = {
       let func_name = self.pt_parse_func_name(rule);
       let ast_t = self.ast(&rule.name, false);
@@ -665,7 +665,7 @@ impl RustEmitter {
           if !enum_discriminants.contains(type_def) {
             enum_discriminants.push(type_def.clone());
           }
-          let t = self.ast(&type_def, false);
+          let t = self.ast(type_def, false);
           Code::Line(format!("{t},"))
         })
         .collect::<Vec<_>>();
@@ -721,10 +721,10 @@ impl RustEmitter {
     let ast_ns_t = self.ast(&rule.name, true);
     let pt_t = self.pt_outer_type(lang, &rule.name);
     let func = &hook.name;
-    let start = format!("#[inline] fn from_ast(ast: &'p {ast_ns_t}, si: &mut SemInfo, err: &mut Vec<Error>) -> {pt_t} {{");
+    let start = format!("#[inline] #[allow(clippy::unnecessary_mut_passed)] fn from_ast(ast: &'p {ast_ns_t}, ctx: &mut Ctx) -> {pt_t} {{");
     let body = vec![
-      Code::Line("let mut pt = Self::from_ast_internal(ast, si, err);".to_owned()),
-      Code::Line(format!("ParseHook {{ val: {func}(&mut pt, si, err), pt }}")),
+      Code::Line("let mut pt = Self::from_ast_internal(ast, ctx);".to_owned()),
+      Code::Line(format!("ParseHook {{ val: {func}(&mut pt, ctx), pt }}")),
     ];
     let end = "}".to_owned();
     Code::Block {
@@ -789,7 +789,7 @@ impl Emitter for RustEmitter {
       // Escape the regex literal
       let mut escape = String::new();
       while literal.contains(&format!("\"{}", escape)) {
-        escape.push_str("#");
+        escape.push('#');
       }
       let literal = literal.replace(r"\/", "/");
       self.regex_block.push(Code::Line(format!(
@@ -860,6 +860,7 @@ impl Emitter for RustEmitter {
       start: format!("{crate_name}::sdk!("),
       body: vec![
         Code::Line(format!("{crate_name};")),
+        Code::Line(format!("context: {t};", t = &lang.context)),
         Code::Line(format!("target: {t};", t = &lang.target)),
         Code::Block {
           indent: self.indent,

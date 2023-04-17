@@ -1,4 +1,4 @@
-use crate::sdk::generated::{pt, SemInfo};
+use crate::sdk::grammar::{pt, Ctx};
 use crate::sdk::Error;
 
 /// Expression used in a function rule derivation body.
@@ -31,7 +31,7 @@ impl Expr {
 }
 
 /// Parser hook for Expr
-pub fn parse_expr(pt: &pt::Expression, _si: &mut SemInfo, errors: &mut Vec<Error>) -> Option<Expr> {
+pub fn parse_expr(pt: &pt::Expression, ctx: &mut Ctx) -> Option<Expr> {
   match pt {
     pt::Expression::ConcatExpression(pt) => {
       // Make sure we have at least 1 item
@@ -50,7 +50,7 @@ pub fn parse_expr(pt: &pt::Expression, _si: &mut SemInfo, errors: &mut Vec<Error
       if vars.is_empty() {
         let msg = "Cannot make empty dictionary.".to_owned();
         let help = "If this rule is optional when deriving, consider making that parameter optional (i.e. foo: optional Bar).".to_owned();
-        errors.push(Error::from_token(&pt.ast.m_0, msg, help));
+        ctx.err.push(Error::from_token(&pt.ast.m_0, msg, help));
         return None;
       }
       Some(Expr::Dict(vars.clone().into()))

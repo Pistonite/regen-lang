@@ -1,5 +1,5 @@
 use super::rule::ParamType;
-use crate::sdk::generated::{pt, Sem, SemInfo};
+use crate::sdk::grammar::{pt, Ctx, Sem};
 use crate::sdk::Error;
 
 /// Parameter of a rule derivation.
@@ -47,7 +47,7 @@ impl Param {
 
   pub fn get_type(&self) -> Option<ParamType> {
     if self.is_token {
-      if let Some(_) = &self.match_literal {
+      if self.match_literal.is_some() {
         if self.is_optional {
           // optional token Type "spec"
           Some(ParamType::Bool)
@@ -68,11 +68,7 @@ impl Param {
 
 /// Parser hook for param list
 /// Removes invalid param and checks if there is duplicate param names
-pub fn parse_param_list(
-  pt: &mut pt::ParamList,
-  _si: &mut SemInfo,
-  errors: &mut Vec<Error>,
-) -> Option<Vec<Param>> {
+pub fn parse_param_list(pt: &mut pt::ParamList, ctx: &mut Ctx) -> Option<Vec<Param>> {
   // There aren't going to be many params, so it's fine to use not use a hash set for deduplication
   let mut params = Vec::new();
   for param in pt.vals.iter_mut() {
@@ -91,10 +87,12 @@ pub fn parse_param_list(
     }
 
     let name = &param_val.name;
-    if params.iter().find(|p| &p.name == name).is_some() {
+    if params.iter().any(|p| &p.name == name) {
       let msg = format!("Duplicate parameter name: \"{}\"", name);
       let help = "Rename the parameter or remove the duplicate.".to_string();
-      errors.push(Error::from_token(&param.pt.ast.m_variable, msg, help));
+      ctx
+        .err
+        .push(Error::from_token(&param.pt.ast.m_variable, msg, help));
       // Don't add duplicate params
     } else {
       params.push(param_val);
@@ -105,12 +103,12 @@ pub fn parse_param_list(
 
 /// Parser hook for param
 /// Checks if type is defined and if semantic is valid
-pub fn parse_param(pt: &pt::Parameter, si: &mut SemInfo, errors: &mut Vec<Error>) -> Option<Param> {
+pub fn parse_param(pt: &pt::Parameter, ctx: &mut Ctx) -> Option<Param> {
   // Validate parameter type is defined
   let param_type = pt.m_type.as_ref().as_ref().or_else(|| {
     let msg = "Missing parameter type".to_owned();
     let help = "Add a type after \":\"".to_owned();
-    errors.push(Error::from_token(&pt.ast.m_2, msg, help));
+    ctx.err.push(Error::from_token(&pt.ast.m_2, msg, help));
     None
   })?;
 
@@ -125,7 +123,7 @@ pub fn parse_param(pt: &pt::Parameter, si: &mut SemInfo, errors: &mut Vec<Error>
       None => {
         let msg = "Missing semantic annotation".to_owned();
         let help = "Add semantic annotation inside \"()\"".to_owned();
-        errors.push(Error::from_token(&sem.ast.m_0, msg, help));
+        ctx.err.push(Error::from_token(&sem.ast.m_0, msg, help));
 
         None
       }
@@ -138,10 +136,10 @@ pub fn parse_param(pt: &pt::Parameter, si: &mut SemInfo, errors: &mut Vec<Error>
   if let Some(ast) = pt.ast.m_type.as_ref() {
     if is_token {
       // Token type
-      si.set(&ast.m_id, Sem::SToken);
+      ctx.si.set(&ast.m_id, Sem::SToken);
     } else {
       // Rule type
-      si.set(&ast.m_id, Sem::SRule);
+      ctx.si.set(&ast.m_id, Sem::SRule);
     }
   }
 
@@ -158,7 +156,7 @@ pub fn parse_param(pt: &pt::Parameter, si: &mut SemInfo, errors: &mut Vec<Error>
   };
 
   if !param.is_in_pt() {
-    si.set(
+    ctx.si.set(
       &pt.ast.m_variable,
       Sem::Tag("unused".to_owned(), Box::new(Sem::SVariable)),
     );

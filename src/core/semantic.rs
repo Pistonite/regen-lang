@@ -1,12 +1,6 @@
-use crate::sdk::generated::{pt, SemInfo};
-use crate::sdk::Error;
-pub use String;
+use crate::sdk::grammar::{pt, Ctx};
 
 /// Parser hook for semantic annotations
-pub fn parse_semantic(
-  pt: &pt::DefineSemanticStatement,
-  _: &mut SemInfo,
-  _: &mut Vec<Error>,
-) -> Option<String> {
+pub fn parse_semantic(pt: &pt::DefineSemanticStatement, _: &mut Ctx) -> Option<String> {
   Some(pt.m_id.clone())
 }

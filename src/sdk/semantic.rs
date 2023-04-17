@@ -59,7 +59,7 @@ where
 
 impl<S: Semantic + Clone> SemInfoImpl<S> {
   /// Create a new SemInfo
-  pub fn new<'s>(src: &str) -> SemInfoImpl<S> {
+  pub fn new(src: &str) -> SemInfoImpl<S> {
     Self {
       src: src.to_owned(),
       blocks: Vec::new(),

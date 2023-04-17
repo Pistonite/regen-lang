@@ -6,10 +6,10 @@
   <link rel="stylesheet" href="https://prismjs.com/themes/prism-okaidia.css">
 </head>
 <body>
-  <div><pre class="language-regen"><span class="token comment">// You can include code in the grammar file, similar to a #include directive in C/C++
-</span><span class="token comment">// This will substitute the contents of "src/sdk/generated.rs.pp" into the generated SDK
-</span><span class="token comment">// which can be used for importing custom hooks
-</span><span class="token string">"src/sdk/generated.rs.pp"</span><span class="token punctuation">;</span>
+  <div><pre class="language-regen"><span class="token comment">// Header
+</span><span class="token string">"src/sdk/grammar.rs.pp"</span><span class="token punctuation">;</span>
+
+<span class="token keyword">context</span> <span class="token tag">"Context"</span><span class="token punctuation">;</span>
 
 <span class="token comment">/*===================================
   Tokenizer
@@ -25,13 +25,6 @@
 <span class="token comment">// The extract keyword will exclude the token type when parsing the AST
 </span><span class="token keyword">extract</span> <span class="token keyword">token</span> <span class="unused token tag">Comment</span><span class="token punctuation">;</span>
 
-<span class="token comment">/*
- The token rules are defined with
- &lt;token type&gt; &lt;literal or regex&gt;;
-
- If the token type is the ignore keyword, it will ignore the matched pattern
-*/</span>
-
 <span class="token comment">// Ignore whitespaces
 </span><span class="token keyword">ignore</span> <span class="token regex">/\s+/</span><span class="token punctuation">;</span>
 
@@ -43,13 +36,14 @@
 </span><span class="token tag">Literal</span> <span class="token regex">/"((\\.)|[^\\"])*"/</span><span class="token punctuation">;</span>
 <span class="token tag">RegExp</span> <span class="token regex">/\/((\\.)|[^\\\/])*\//</span><span class="token punctuation">;</span>
 
-<span class="token comment">// Keywords - there are only 6 and we have already seen 3!
+<span class="token comment">// Keywords
 </span><span class="token tag">Keyword</span> <span class="token string">"ignore"</span><span class="token punctuation">;</span>
 <span class="token tag">Keyword</span> <span class="token string">"extract"</span><span class="token punctuation">;</span>
 <span class="token tag">Keyword</span> <span class="token string">"token"</span><span class="token punctuation">;</span>
 <span class="token tag">Keyword</span> <span class="token string">"semantic"</span><span class="token punctuation">;</span>
 <span class="token tag">Keyword</span> <span class="token string">"rule"</span><span class="token punctuation">;</span>
 <span class="token tag">Keyword</span> <span class="token string">"optional"</span><span class="token punctuation">;</span>
+<span class="token tag">Keyword</span> <span class="token string">"context"</span><span class="token punctuation">;</span>
 
 <span class="token comment">// Special Symbols
 </span><span class="token tag">Symbol</span> <span class="token regex">/[{};|()=,:\.\[\]]/</span><span class="token punctuation">;</span>
@@ -72,6 +66,7 @@
 <span class="token keyword">semantic</span> <span class="token tag">Rule</span><span class="token punctuation">;</span>
 <span class="token keyword">semantic</span> <span class="token tag">HookName</span><span class="token punctuation">;</span>
 <span class="token keyword">semantic</span> <span class="token tag">HookType</span><span class="token punctuation">;</span>
+<span class="token keyword">semantic</span> <span class="token tag">ContextType</span><span class="token punctuation">;</span>
 
 <span class="token comment">/*===================================
   Rules
@@ -84,71 +79,80 @@
 </span><span class="token comment">// The parser can be configured to generate one root node,
 </span><span class="token comment">// or keep generating root nodes until the end of the file.
 </span>
-<span class="token comment">// TopLevelStatement is a union rule which says:
-</span><span class="token comment">// A top level statement is either a define rule statement or a top level define statement
-</span><span class="token keyword">rule</span> <span class="token class-name">TopLevelStatement</span> <span class="token punctuation">=</span> <span class="token class-name">DefineRuleStatement</span> <span class="token punctuation">|</span> <span class="token class-name">TopLevelDefineStatement</span><span class="token punctuation">;</span>
+<span class="token keyword">rule</span> <span class="token class-name">TopLevelStatement</span><span class="token punctuation">(</span><span class="token attr-name">body</span><span class="token punctuation">:</span> <span class="token class-name">TopLevelDefine</span><span class="token punctuation">,</span> <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">";"</span><span class="token punctuation">)</span> <span class="token attr-name">body</span><span class="token punctuation">;</span>
 
-<span class="token comment">// This is a funcitonal rule
-</span><span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_rule"</span><span class="token punctuation">:</span><span class="token class-name">"Rule"</span><span class="token punctuation">)</span>              <span class="token comment">// &lt;-- this is the parse tree hook
-</span><span class="token class-name">DefineRuleStatement</span><span class="token punctuation">(</span>                    <span class="token comment">// &lt;-- name of the rule
-</span>    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Keyword</span><span class="token string">"rule"</span><span class="token punctuation">,</span>             <span class="token comment">// &lt;-- parameters
-</span>    <span class="token attr-name">hookAttr</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">HookAttribute</span><span class="token punctuation">,</span>
+<span class="token keyword">rule</span> <span class="token class-name">TopLevelDefine</span> <span class="token punctuation">=</span> 
+  <span class="token class-name">TokenLiteral</span>
+  <span class="token punctuation">|</span> <span class="token class-name">DefineContextStatement</span>
+  <span class="token punctuation">|</span> <span class="token class-name">DefineRuleStatement</span>
+  <span class="token punctuation">|</span> <span class="token class-name">DefineTokenTypeStatement</span>
+  <span class="token punctuation">|</span> <span class="token class-name">DefineIgnoreTokenRuleStatement</span>
+  <span class="token punctuation">|</span> <span class="token class-name">DefineTokenRuleStatement</span>
+  <span class="token punctuation">|</span> <span class="token class-name">DefineSemanticStatement</span><span class="token punctuation">;</span>
+
+<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_context"</span><span class="token punctuation">:</span><span class="token regex">"()"</span><span class="token punctuation">)</span>
+<span class="token class-name">DefineContextStatement</span><span class="token punctuation">(</span>
+    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Keyword</span><span class="token string">"context"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">(</span><span class="token tag">ContextType</span><span class="token punctuation">)</span> <span class="token attr-name">contextType</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Literal</span>
+<span class="token punctuation">)</span> <span class="token attr-name">contextType</span><span class="token punctuation">;</span>
+
+<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_rule"</span><span class="token punctuation">:</span><span class="token regex">"Rule"</span><span class="token punctuation">)</span>
+<span class="token class-name">DefineRuleStatement</span><span class="token punctuation">(</span>
+    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Keyword</span><span class="token string">"rule"</span><span class="token punctuation">,</span>
+    <span class="token attr-name">hookAttr</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">HookAttribute</span><span class="token punctuation">,</span>
     <span class="token punctuation">(</span><span class="token tag">Rule</span><span class="token punctuation">)</span> <span class="token attr-name">ruleName</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span><span class="token punctuation">,</span>
     <span class="token attr-name">body</span><span class="token punctuation">:</span> <span class="token class-name">RuleDefineBody</span>
-<span class="token punctuation">)</span> <span class="token punctuation">{</span>                                     <span class="token comment">// &lt;-- body
-</span>    <span class="token attr-name">hookAttr</span><span class="token punctuation">,</span> <span class="token attr-name">ruleName</span><span class="token punctuation">,</span> <span class="token attr-name">body</span>
+<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token attr-name">hookAttr</span><span class="token punctuation">,</span> <span class="token attr-name">ruleName</span><span class="token punctuation">,</span> <span class="token attr-name">body</span>
 <span class="token punctuation">}</span><span class="token punctuation">;</span>
 
-
-<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_hook"</span><span class="token punctuation">:</span><span class="token class-name">"Hook"</span><span class="token punctuation">)</span>                <span class="token comment">// The parse tree hook is a custom function that
-</span><span class="token class-name">HookAttribute</span><span class="token punctuation">(</span>                            <span class="token comment">// takes in the parse tree node, and returns an object
-</span>    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">"("</span><span class="token punctuation">,</span>                   <span class="token comment">// to be embedded into the parse tree.
-</span>    <span class="token punctuation">(</span><span class="token tag">HookName</span><span class="token punctuation">)</span> <span class="token attr-name">hookName</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Literal</span><span class="token punctuation">,</span>   <span class="token comment">// Here, the HookAttribute node will be turned into a Hook object
-</span>    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">":"</span><span class="token punctuation">,</span>
+<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_hook"</span><span class="token punctuation">:</span><span class="token regex">"Hook"</span><span class="token punctuation">)</span>
+<span class="token class-name">HookAttribute</span><span class="token punctuation">(</span>
+    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">"("</span><span class="token punctuation">,</span>
+    <span class="token punctuation">(</span><span class="token tag">HookName</span><span class="token punctuation">)</span> <span class="token attr-name">hookName</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Literal</span><span class="token punctuation">,</span>
+    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">":"</span><span class="token punctuation">,</span>
     <span class="token punctuation">(</span><span class="token tag">HookType</span><span class="token punctuation">)</span> <span class="token attr-name">hookType</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Literal</span><span class="token punctuation">,</span>
     <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">")"</span>
-<span class="token punctuation">)</span> <span class="token punctuation">{</span>                                       <span class="token comment">// this body is a dict expression that groups the parameters
-</span>    <span class="token attr-name">hookName</span><span class="token punctuation">,</span> <span class="token attr-name">hookType</span>
+<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token attr-name">hookName</span><span class="token punctuation">,</span> <span class="token attr-name">hookType</span>
 <span class="token punctuation">}</span><span class="token punctuation">;</span>
 
-<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_rule_value"</span><span class="token punctuation">:</span><span class="token class-name">"RuleValue"</span><span class="token punctuation">)</span>     <span class="token comment">// hooks can be applied to union rules as well
-</span><span class="token class-name">RuleDefineBody</span> <span class="token punctuation">=</span> 
+<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_rule_value"</span><span class="token punctuation">:</span><span class="token regex">"RuleValue"</span><span class="token punctuation">)</span>
+<span class="token class-name">RuleDefineBody</span> <span class="token punctuation">=</span> 
   <span class="token class-name">UnionRuleBody</span> <span class="token punctuation">|</span> 
   <span class="token class-name">FunctionalRuleBody</span><span class="token punctuation">;</span>
 
 <span class="token keyword">rule</span> <span class="token class-name">UnionRuleBody</span><span class="token punctuation">(</span>
-    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">"="</span><span class="token punctuation">,</span>                   <span class="token comment">// the parameters define how the tree is derived
-</span>    <span class="token attr-name">rules</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">UnionRuleList</span><span class="token punctuation">,</span>        <span class="token comment">// this on the left says to derive a UnionRuleBody,
-</span>    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">";"</span>                    <span class="token comment">// the parser needs to see a "=", then an optional 
-</span><span class="token punctuation">)</span> <span class="token attr-name">rules</span><span class="token punctuation">;</span>                                  <span class="token comment">// UnionRuleList, then finally a ";"
-</span>
+    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">"="</span><span class="token punctuation">,</span>
+    <span class="token attr-name">rules</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">UnionRuleList</span>
+<span class="token punctuation">)</span> <span class="token attr-name">rules</span><span class="token punctuation">;</span>
+
 <span class="token keyword">rule</span> <span class="token class-name">UnionRuleList</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token tag">Rule</span><span class="token punctuation">)</span> <span class="token attr-name">first</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span><span class="token punctuation">,</span> <span class="token attr-name">rest</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">UnionRuleListTail</span><span class="token punctuation">)</span> <span class="token attr-name">first</span> <span class="token punctuation">|</span> <span class="token attr-name">rest</span><span class="token punctuation">;</span>
 <span class="token keyword">rule</span> <span class="token class-name">UnionRuleListTail</span><span class="token punctuation">(</span>
-    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">"|"</span><span class="token punctuation">,</span>                   <span class="token comment">// "token Symbol"|"" is the type of the parameter
-</span>    <span class="token punctuation">(</span><span class="token tag">Rule</span><span class="token punctuation">)</span> <span class="token attr-name">first</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span><span class="token punctuation">,</span>       <span class="token comment">// it means to match a token with type Symbol and is literally "|"
-</span>    <span class="token attr-name">rest</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">UnionRuleListTail</span>
+    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">"|"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">(</span><span class="token tag">Rule</span><span class="token punctuation">)</span> <span class="token attr-name">first</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span><span class="token punctuation">,</span>
+    <span class="token attr-name">rest</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">UnionRuleListTail</span>
 <span class="token punctuation">)</span> <span class="token attr-name">first</span> <span class="token punctuation">|</span> <span class="token attr-name">rest</span><span class="token punctuation">;</span>
 
 
 <span class="token keyword">rule</span> <span class="token class-name">FunctionalRuleBody</span><span class="token punctuation">(</span>
     <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">"("</span><span class="token punctuation">,</span>
-    <span class="token attr-name">params</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">ParamList</span><span class="token punctuation">,</span>           <span class="token comment">// the type can also be a subrule, 
-</span>    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">")"</span><span class="token punctuation">,</span>                   <span class="token comment">// and both tokens and subrules can be optional
-</span>    <span class="token attr-name">body</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">Expression</span><span class="token punctuation">,</span>
-    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">";"</span>
+    <span class="token attr-name">params</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">ParamList</span><span class="token punctuation">,</span>
+    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">")"</span><span class="token punctuation">,</span>
+    <span class="token attr-name">body</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">Expression</span>
 <span class="token punctuation">)</span> <span class="token punctuation">{</span>
     <span class="token attr-name">params</span><span class="token punctuation">,</span> <span class="token attr-name">body</span>
 <span class="token punctuation">}</span><span class="token punctuation">;</span>
 
 
-<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_param_list"</span><span class="token punctuation">:</span><span class="token class-name">"Vec&lt;Param&gt;"</span><span class="token punctuation">)</span> <span class="token class-name">ParamList</span><span class="token punctuation">(</span><span class="token attr-name">first</span><span class="token punctuation">:</span> <span class="token class-name">Parameter</span><span class="token punctuation">,</span> <span class="token attr-name">rest</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">ParamListTail</span><span class="token punctuation">)</span> <span class="token attr-name">first</span> <span class="token punctuation">|</span> <span class="token attr-name">rest</span><span class="token punctuation">;</span>
+<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_param_list"</span><span class="token punctuation">:</span><span class="token regex">"Vec&lt;Param&gt;"</span><span class="token punctuation">)</span> <span class="token class-name">ParamList</span><span class="token punctuation">(</span><span class="token attr-name">first</span><span class="token punctuation">:</span> <span class="token class-name">Parameter</span><span class="token punctuation">,</span> <span class="token attr-name">rest</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">ParamListTail</span><span class="token punctuation">)</span> <span class="token attr-name">first</span> <span class="token punctuation">|</span> <span class="token attr-name">rest</span><span class="token punctuation">;</span>
 <span class="token keyword">rule</span> <span class="token class-name">ParamListTail</span><span class="token punctuation">(</span><span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">","</span><span class="token punctuation">,</span> <span class="token attr-name">first</span><span class="token punctuation">:</span> <span class="token class-name">Parameter</span><span class="token punctuation">,</span> <span class="token attr-name">rest</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">ParamListTail</span><span class="token punctuation">)</span> <span class="token attr-name">first</span> <span class="token punctuation">|</span> <span class="token attr-name">rest</span><span class="token punctuation">;</span>
 
-<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_param"</span><span class="token punctuation">:</span><span class="token class-name">"Param"</span><span class="token punctuation">)</span> <span class="token class-name">Parameter</span><span class="token punctuation">(</span>
+<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_param"</span><span class="token punctuation">:</span><span class="token regex">"Param"</span><span class="token punctuation">)</span> <span class="token class-name">Parameter</span><span class="token punctuation">(</span>
     <span class="token attr-name">semAttr</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">ParamSemantic</span><span class="token punctuation">,</span>
-    <span class="token punctuation">(</span><span class="token tag">Variable</span><span class="token punctuation">)</span> <span class="token attr-name">variable</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span><span class="token punctuation">,</span>  <span class="token comment">// here, "(Variable)" is a semantic annotation
-</span>    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">":"</span><span class="token punctuation">,</span>                     <span class="token comment">// it will mark the token with the Variable semantic
-</span>    <span class="token attr-name">type</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">RuleType</span>
+    <span class="token punctuation">(</span><span class="token tag">Variable</span><span class="token punctuation">)</span> <span class="token attr-name">variable</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span><span class="token punctuation">,</span>
+    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">":"</span><span class="token punctuation">,</span>
+    <span class="token attr-name">type</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">RuleType</span>
 <span class="token punctuation">)</span> <span class="token punctuation">{</span>
     <span class="token attr-name">semAttr</span><span class="token punctuation">,</span> <span class="token attr-name">variable</span><span class="token punctuation">,</span> <span class="token attr-name">type</span>
 <span class="token punctuation">}</span><span class="token punctuation">;</span>
@@ -157,11 +161,8 @@
     <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">"("</span><span class="token punctuation">,</span>
     <span class="token punctuation">(</span><span class="token tag">Semantic</span><span class="token punctuation">)</span> <span class="token attr-name">semanticName</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span><span class="token punctuation">,</span>
     <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">")"</span>
-<span class="token punctuation">)</span> <span class="token attr-name">semanticName</span><span class="token punctuation">;</span>                      <span class="token comment">// the body of the rule can be one of 3 things
-</span>                                     <span class="token comment">// Dict: {a, b, ...} where a and b are parameters
-</span>                                     <span class="token comment">// Val: a where a is a parameter
-</span>                                     <span class="token comment">// Concat: a | ... | b where a and b are parameters, and b must be a vector type         
-</span>
+<span class="token punctuation">)</span> <span class="token attr-name">semanticName</span><span class="token punctuation">;</span> 
+
 <span class="token keyword">rule</span> <span class="token class-name">RuleType</span><span class="token punctuation">(</span>
     <span class="token attr-name">kwOptional</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token keyword">token</span> <span class="token tag">Keyword</span><span class="token string">"optional"</span><span class="token punctuation">,</span>
     <span class="token attr-name">kwToken</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token keyword">token</span> <span class="token tag">Keyword</span><span class="token string">"token"</span><span class="token punctuation">,</span>
@@ -171,16 +172,7 @@
     <span class="token attr-name">kwOptional</span><span class="token punctuation">,</span> <span class="token attr-name">kwToken</span><span class="token punctuation">,</span> <span class="token attr-name">id</span><span class="token punctuation">,</span> <span class="token attr-name">tokenContent</span>
 <span class="token punctuation">}</span><span class="token punctuation">;</span>
 
-<span class="token keyword">rule</span> <span class="token class-name">TopLevelDefineStatement</span><span class="token punctuation">(</span><span class="token attr-name">body</span><span class="token punctuation">:</span> <span class="token class-name">TopLevelDefine</span><span class="token punctuation">,</span> <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">";"</span><span class="token punctuation">)</span> <span class="token attr-name">body</span><span class="token punctuation">;</span>
-
-<span class="token keyword">rule</span> <span class="token class-name">TopLevelDefine</span> <span class="token punctuation">=</span> 
-  <span class="token class-name">TokenLiteral</span>
-  <span class="token punctuation">|</span> <span class="token class-name">DefineTokenTypeStatement</span>
-  <span class="token punctuation">|</span> <span class="token class-name">DefineIgnoreTokenRuleStatement</span>
-  <span class="token punctuation">|</span> <span class="token class-name">DefineTokenRuleStatement</span>
-  <span class="token punctuation">|</span> <span class="token class-name">DefineSemanticStatement</span><span class="token punctuation">;</span>
-
-<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_token_def"</span><span class="token punctuation">:</span><span class="token class-name">"TokenDef"</span><span class="token punctuation">)</span> <span class="token class-name">DefineTokenTypeStatement</span><span class="token punctuation">(</span>
+<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_token_def"</span><span class="token punctuation">:</span><span class="token regex">"TokenDef"</span><span class="token punctuation">)</span> <span class="token class-name">DefineTokenTypeStatement</span><span class="token punctuation">(</span>
     <span class="token attr-name">kwExtract</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token keyword">token</span> <span class="token tag">Keyword</span><span class="token string">"extract"</span><span class="token punctuation">,</span>
     <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Keyword</span><span class="token string">"token"</span><span class="token punctuation">,</span>
     <span class="token punctuation">(</span><span class="token tag">Token</span><span class="token punctuation">)</span> <span class="token attr-name">tokenType</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span>
@@ -188,10 +180,10 @@
     <span class="token attr-name">kwExtract</span><span class="token punctuation">,</span> <span class="token attr-name">tokenType</span>
 <span class="token punctuation">}</span><span class="token punctuation">;</span>
 
-<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_token_ignore_rule"</span><span class="token punctuation">:</span><span class="token class-name">"TokenRule"</span><span class="token punctuation">)</span>
+<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_token_ignore_rule"</span><span class="token punctuation">:</span><span class="token regex">"TokenRule"</span><span class="token punctuation">)</span>
 <span class="token class-name">DefineIgnoreTokenRuleStatement</span><span class="token punctuation">(</span><span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Keyword</span><span class="token string">"ignore"</span><span class="token punctuation">,</span> <span class="token attr-name">value</span><span class="token punctuation">:</span> <span class="token class-name">LiteralOrRegExp</span><span class="token punctuation">)</span> <span class="token attr-name">value</span><span class="token punctuation">;</span>
 
-<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_token_rule"</span><span class="token punctuation">:</span><span class="token class-name">"TokenRule"</span><span class="token punctuation">)</span> <span class="token class-name">DefineTokenRuleStatement</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token tag">Token</span><span class="token punctuation">)</span> <span class="token attr-name">tokenType</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span><span class="token punctuation">,</span> <span class="token attr-name">value</span><span class="token punctuation">:</span> <span class="token class-name">LiteralOrRegExp</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_token_rule"</span><span class="token punctuation">:</span><span class="token regex">"TokenRule"</span><span class="token punctuation">)</span> <span class="token class-name">DefineTokenRuleStatement</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token tag">Token</span><span class="token punctuation">)</span> <span class="token attr-name">tokenType</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span><span class="token punctuation">,</span> <span class="token attr-name">value</span><span class="token punctuation">:</span> <span class="token class-name">LiteralOrRegExp</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
     <span class="token attr-name">tokenType</span><span class="token punctuation">,</span> <span class="token attr-name">value</span>
 <span class="token punctuation">}</span><span class="token punctuation">;</span>
 
@@ -199,21 +191,21 @@
 <span class="token keyword">rule</span> <span class="token class-name">TokenLiteral</span><span class="token punctuation">(</span><span class="token attr-name">t</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Literal</span><span class="token punctuation">)</span> <span class="token attr-name">t</span><span class="token punctuation">;</span>
 <span class="token keyword">rule</span> <span class="token class-name">TokenRegExp</span><span class="token punctuation">(</span><span class="token attr-name">t</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">RegExp</span><span class="token punctuation">)</span> <span class="token attr-name">t</span><span class="token punctuation">;</span>
 
-<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_semantic"</span><span class="token punctuation">:</span><span class="token class-name">"String"</span><span class="token punctuation">)</span> <span class="token class-name">DefineSemanticStatement</span><span class="token punctuation">(</span><span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Keyword</span><span class="token string">"semantic"</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token tag">Semantic</span><span class="token punctuation">)</span> <span class="token attr-name">id</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span><span class="token punctuation">)</span> <span class="token attr-name">id</span><span class="token punctuation">;</span>
+<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_semantic"</span><span class="token punctuation">:</span><span class="token regex">"String"</span><span class="token punctuation">)</span> <span class="token class-name">DefineSemanticStatement</span><span class="token punctuation">(</span><span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Keyword</span><span class="token string">"semantic"</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token tag">Semantic</span><span class="token punctuation">)</span> <span class="token attr-name">id</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span><span class="token punctuation">)</span> <span class="token attr-name">id</span><span class="token punctuation">;</span>
 
-<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_expr"</span><span class="token punctuation">:</span><span class="token class-name">"Expr"</span><span class="token punctuation">)</span> <span class="token class-name">Expression</span> <span class="token punctuation">=</span> <span class="token class-name">ConcatExpression</span> <span class="token punctuation">|</span> <span class="token class-name">DictExpression</span><span class="token punctuation">;</span>
+<span class="token keyword">rule</span> <span class="token punctuation">(</span><span class="token function">"parse_expr"</span><span class="token punctuation">:</span><span class="token regex">"Expr"</span><span class="token punctuation">)</span> <span class="token class-name">Expression</span> <span class="token punctuation">=</span> <span class="token class-name">ConcatExpression</span> <span class="token punctuation">|</span> <span class="token class-name">DictExpression</span><span class="token punctuation">;</span>
 
-<span class="token keyword">rule</span> <span class="token class-name">ConcatExpression</span><span class="token punctuation">(</span>                       <span class="token comment">// here is an example of a vector type
-</span>    <span class="token punctuation">(</span><span class="token tag">Variable</span><span class="token punctuation">)</span> <span class="token attr-name">first</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span><span class="token punctuation">,</span>      <span class="token comment">// the return types are all inferred and recursively resolved
-</span>    <span class="token attr-name">rest</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">ConcatExpressionTail</span>      <span class="token comment">// here, the return type is a vector of "token Identifier"
-</span><span class="token punctuation">)</span> <span class="token attr-name">first</span> <span class="token punctuation">|</span> <span class="token attr-name">rest</span><span class="token punctuation">;</span>                              <span class="token comment">// it is resolved as:
-</span><span class="token keyword">rule</span> <span class="token class-name">ConcatExpressionTail</span><span class="token punctuation">(</span>                   <span class="token comment">//  - ConcatExpression must return a vector of "token Identifier"
-</span>    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">"|"</span><span class="token punctuation">,</span>                      <span class="token comment">//      because it is a concat expression
-</span>    <span class="token attr-name">rest</span><span class="token punctuation">:</span> <span class="token class-name">ConcatExpression</span>                   <span class="token comment">//  - ConcatExpressionTail must return a vector of "token Identifier"
-</span><span class="token punctuation">)</span> <span class="token attr-name">rest</span><span class="token punctuation">;</span>                                      <span class="token comment">//      because it is the last variable in the concatenation
-</span>                                             <span class="token comment">//  - ConcatExpressionTail returns "rest", which is ConcatExpression
-</span><span class="token keyword">rule</span> <span class="token class-name">DictExpression</span><span class="token punctuation">(</span>                         <span class="token comment">//  - it is resolved because return types are consistent
-</span>    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">"{"</span><span class="token punctuation">,</span>
+<span class="token keyword">rule</span> <span class="token class-name">ConcatExpression</span><span class="token punctuation">(</span>
+    <span class="token punctuation">(</span><span class="token tag">Variable</span><span class="token punctuation">)</span> <span class="token attr-name">first</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Identifier</span><span class="token punctuation">,</span>
+    <span class="token attr-name">rest</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">ConcatExpressionTail</span>
+<span class="token punctuation">)</span> <span class="token attr-name">first</span> <span class="token punctuation">|</span> <span class="token attr-name">rest</span><span class="token punctuation">;</span>
+<span class="token keyword">rule</span> <span class="token class-name">ConcatExpressionTail</span><span class="token punctuation">(</span>
+    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">"|"</span><span class="token punctuation">,</span>
+    <span class="token attr-name">rest</span><span class="token punctuation">:</span> <span class="token class-name">ConcatExpression</span>
+<span class="token punctuation">)</span> <span class="token attr-name">rest</span><span class="token punctuation">;</span>
+
+<span class="token keyword">rule</span> <span class="token class-name">DictExpression</span><span class="token punctuation">(</span>
+    <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">"{"</span><span class="token punctuation">,</span>
     <span class="token attr-name">values</span><span class="token punctuation">:</span> <span class="token keyword">optional</span> <span class="token class-name">VariableList</span><span class="token punctuation">,</span>
     <span class="unused token attr-name">_</span><span class="token punctuation">:</span> <span class="token keyword">token</span> <span class="token tag">Symbol</span><span class="token string">"}"</span>
 <span class="token punctuation">)</span> <span class="token attr-name">values</span><span class="token punctuation">;</span>

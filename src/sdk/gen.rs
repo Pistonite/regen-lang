@@ -5,6 +5,7 @@
 macro_rules! sdk {
   (
     $regen:ident;
+    context: $context:ty;
     target: $target:ident;
     tokens: [ $( $token_type:ident ),* , ];
     regex: [ $( $token_regex:ident = $token_regex_literal:literal ),* , ];
@@ -12,7 +13,6 @@ macro_rules! sdk {
     semantics: [ $( $sem_type:ident ),* , ];
   ) => {
     use $regen::sdk::{
-      Error,
       ParseHook,
       TokenImpl,
       TokenStream,
@@ -28,8 +28,8 @@ macro_rules! sdk {
     // Type aliases
     pub type SemInfo = SemInfoImpl<Sem>;
     pub type Token = TokenImpl<Tok>;
-    pub type Env = EnvImpl<Tok, Sem, ast::$target, ()>;
-    pub type Ctx = ContextImpl<(), Sem>;
+    pub type Env = EnvImpl<Tok, Sem, ast::$target, $context>;
+    pub type Ctx = ContextImpl<$context, Sem>;
 
     /// Token type enum
     #[derive(Debug, Clone)]
@@ -69,6 +69,7 @@ macro_rules! sdk {
     impl RootParser for Env {
       type T = Tok;
       type S = Sem;
+      type C = $context;
       type A = ast::$target;
       type P<'p> = pt::$target<'p>;
 
@@ -80,15 +81,16 @@ macro_rules! sdk {
         tokens
       }
 
-      fn parse_ast_root(ts: &mut TokenStream<Self::T>, si: &mut SemInfoImpl<Self::S>) -> Option<Self::A>{
+      fn parse_ast_root(ts: &mut TokenStream<Self::T>, si: &mut SemInfo) -> Option<Self::A>{
         let ast = ast::$target::parse(ts);
         if let Some(ast) = &ast {
           ast.apply_semantic(si, &None);
         }
         ast
       }
-      fn parse_pt_root<'a>(ast: &'a Self::A, si: &mut SemInfoImpl<Self::S>, err: &mut Vec<Error>) -> Self::P<'a> {
-        pt::$target::from_ast(ast, si, err)
+
+      fn parse_pt_root<'a>(ast: &'a Self::A, ctx: &mut Ctx) -> Self::P<'a> {
+        pt::$target::from_ast(ast, ctx)
       }
     }
 
@@ -299,11 +301,11 @@ macro_rules! impl_union {
       }
     }
     impl<'p> pt::$type_name<'p> {
-      fn $from_ast(ast: &'p ast::$type_name, si: &mut SemInfo, err: &mut Vec<Error>) -> Self {
+      fn $from_ast(ast: &'p ast::$type_name, ctx: &mut Ctx) -> Self {
         match ast {
           $(
             ast::$type_name::$derivation_type_name(ast) => {
-              return Self::$derivation_type_name(Box::new(pt::$derivation_type_name::from_ast(ast, si, err)));
+              return Self::$derivation_type_name(Box::new(pt::$derivation_type_name::from_ast(ast, ctx)));
             }
           )*
         }

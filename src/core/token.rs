@@ -1,5 +1,4 @@
-use crate::sdk::generated::{pt, Sem, SemInfo};
-use crate::sdk::Error;
+use crate::sdk::grammar::{pt, Ctx, Sem};
 
 /// Definition for a token type used by the tokenizer
 ///
@@ -45,14 +44,10 @@ impl TokenRule {
   }
 }
 
-pub fn parse_token_def(
-  pt: &pt::DefineTokenTypeStatement,
-  si: &mut SemInfo,
-  _errors: &mut Vec<Error>,
-) -> Option<TokenDef> {
+pub fn parse_token_def(pt: &pt::DefineTokenTypeStatement, ctx: &mut Ctx) -> Option<TokenDef> {
   if pt.m_kw_extract {
     // Extracted tokens are not used in AST generation. Tag it to indicate that
-    si.set(
+    ctx.si.set(
       &pt.ast.m_token_type,
       Sem::Tag("unused".to_owned(), Box::new(Sem::SToken)),
     )
@@ -65,8 +60,7 @@ pub fn parse_token_def(
 
 pub fn parse_token_ignore_rule(
   pt: &pt::DefineIgnoreTokenRuleStatement,
-  _si: &mut SemInfo,
-  _errors: &mut Vec<Error>,
+  _: &mut Ctx,
 ) -> Option<TokenRule> {
   match pt.m_value.as_ref() {
     pt::LiteralOrRegExp::TokenLiteral(literal) => {
@@ -78,11 +72,7 @@ pub fn parse_token_ignore_rule(
   }
 }
 
-pub fn parse_token_rule(
-  pt: &pt::DefineTokenRuleStatement,
-  _si: &mut SemInfo,
-  _errors: &mut Vec<Error>,
-) -> Option<TokenRule> {
+pub fn parse_token_rule(pt: &pt::DefineTokenRuleStatement, _: &mut Ctx) -> Option<TokenRule> {
   match pt.m_value.as_ref() {
     pt::LiteralOrRegExp::TokenLiteral(literal) => Some(TokenRule::Literal(
       pt.m_token_type.clone(),

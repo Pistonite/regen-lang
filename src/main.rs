@@ -1,7 +1,8 @@
 use clap::{Parser, ValueEnum};
+use regen::core::Context;
 use regen::emit;
 use regen::sdk::{
-  generated::{Ctx, Env},
+  grammar::{Ctx, Env},
   EnvMode,
 };
 use std::fs;
@@ -84,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       } else {
         fs::read_to_string(template).unwrap()
       };
-      let mut env = Env::new(&source, EnvMode::All, stack_size);
+      let mut env = Env::new_ctx(&source, EnvMode::All, stack_size, Context::default());
       let generated_code = emit::emit_html(&mut env, &template_html, emit::to_prismjs);
       write_output(&generated_code, &output)?;
       let ctx: Ctx = env.into();
@@ -99,7 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       let path = PathBuf::from(&input);
       let parent_path = path.parent().unwrap();
       let source = fs::read_to_string(input)?;
-      let mut env = Env::new(&source, EnvMode::All, stack_size);
+      let mut env = Env::new_ctx(&source, EnvMode::All, stack_size, Context::default());
 
       let emitter = match target {
         SdkTarget::Rust => emit::RustEmitter::new(false, 2, parent_path.to_path_buf()),

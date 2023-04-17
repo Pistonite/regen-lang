@@ -9,11 +9,11 @@ pub enum Code {
   },
 }
 
-impl Into<Vec<String>> for Code {
-  fn into(self) -> Vec<String> {
-    match self {
-      Self::Line(line) => vec![line],
-      Self::Block {
+impl From<Code> for Vec<String> {
+  fn from(code: Code) -> Self {
+    match code {
+      Code::Line(line) => vec![line],
+      Code::Block {
         indent,
         inline,
         start,
@@ -26,7 +26,7 @@ impl Into<Vec<String>> for Code {
             let sub_lines: Vec<String> = code.into();
             let last = lines.last_mut().unwrap();
             last.push(' ');
-            last.push_str(&sub_lines.first().unwrap());
+            last.push_str(sub_lines.first().unwrap());
             for line in sub_lines.into_iter().skip(1) {
               lines.push(format!("{}{}", " ".repeat(indent), line));
             }

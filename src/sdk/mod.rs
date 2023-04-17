@@ -1,4 +1,4 @@
-pub mod generated;
+pub mod grammar;
 
 mod util;
 pub use util::{Error, ParseHook};
