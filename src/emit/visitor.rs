@@ -1,10 +1,5 @@
+use crate::core::{Language, Rule, TokenDef, TokenRule};
 use std::error::Error;
-use crate::core::{
-  Language,
-  TokenDef,
-  TokenRule,
-  Rule,
-};
 
 pub trait Emitter {
   fn emit_include(&mut self, lang: &Language, path: &str);

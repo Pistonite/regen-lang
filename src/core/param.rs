@@ -1,5 +1,5 @@
 use super::rule::ParamType;
-use crate::sdk::generated::{pt, SemInfo, Sem};
+use crate::sdk::generated::{pt, Sem, SemInfo};
 use crate::sdk::Error;
 
 /// Parameter of a rule derivation.
@@ -151,7 +151,10 @@ pub fn parse_param(pt: &pt::Parameter, si: &mut SemInfo, errors: &mut Vec<Error>
     type_name: param_type.m_id.clone(),
     is_token,
     is_optional: param_type.m_kw_optional,
-    match_literal: param_type.m_token_content.as_ref().map(|x|super::strip_quotes(x)),
+    match_literal: param_type
+      .m_token_content
+      .as_ref()
+      .map(|x| super::strip_quotes(x)),
   };
 
   if !param.is_in_pt() {
@@ -163,128 +166,3 @@ pub fn parse_param(pt: &pt::Parameter, si: &mut SemInfo, errors: &mut Vec<Error>
 
   Some(param)
 }
-
-/// Convinience macro for creating a Param
-macro_rules! param {
-  ($identifier:literal : $type:literal) => {
-    Param {
-      semantic: None,
-      name: $identifier.to_string(),
-      type_name: $type.to_string(),
-      is_token: false,
-      is_optional: false,
-      match_literal: None,
-    }
-  };
-  ($identifier:literal : optional $type:literal) => {
-    Param {
-      semantic: None,
-      name: $identifier.to_string(),
-      type_name: $type.to_string(),
-      is_token: false,
-      is_optional: true,
-      match_literal: None,
-    }
-  };
-  ($identifier:literal : token $type:literal) => {
-    Param {
-      semantic: None,
-      name: $identifier.to_string(),
-      type_name: $type.to_string(),
-      is_token: true,
-      is_optional: false,
-      match_literal: None,
-    }
-  };
-  ($identifier:literal : optional token $type:literal) => {
-    Param {
-      semantic: None,
-      name: $identifier.to_string(),
-      type_name: $type.to_string(),
-      is_token: true,
-      is_optional: true,
-      match_literal: None,
-    }
-  };
-  ($identifier:literal : token $type:literal $spec:literal) => {
-    Param {
-      semantic: None,
-      name: $identifier.to_string(),
-      type_name: $type.to_string(),
-      is_token: true,
-      is_optional: false,
-      match_literal: Some($spec.to_string()),
-    }
-  };
-  ($identifier:literal : optional token $type:literal $spec:literal) => {
-    Param {
-      semantic: None,
-      name: $identifier.to_string(),
-      type_name: $type.to_string(),
-      is_token: true,
-      is_optional: true,
-      match_literal: Some($spec.to_string()),
-    }
-  };
-  (($semantic:literal) $identifier:literal : $type:literal) => {
-    Param {
-      semantic: Some($semantic.to_string()),
-      name: $identifier.to_string(),
-      type_name: $type.to_string(),
-      is_token: false,
-      is_optional: false,
-      match_literal: None,
-    }
-  };
-  (($semantic:literal) $identifier:literal : optional $type:literal) => {
-    Param {
-      semantic: Some($semantic.to_string()),
-      name: $identifier.to_string(),
-      type_name: $type.to_string(),
-      is_token: false,
-      is_optional: true,
-      match_literal: None,
-    }
-  };
-  (($semantic:literal) $identifier:literal : token $type:literal) => {
-    Param {
-      semantic: Some($semantic.to_string()),
-      name: $identifier.to_string(),
-      type_name: $type.to_string(),
-      is_token: true,
-      is_optional: false,
-      match_literal: None,
-    }
-  };
-  (($semantic:literal) $identifier:literal : optional token $type:literal) => {
-    Param {
-      semantic: Some($semantic.to_string()),
-      name: $identifier.to_string(),
-      type_name: $type.to_string(),
-      is_token: true,
-      is_optional: true,
-      match_literal: None,
-    }
-  };
-  (($semantic:literal) $identifier:literal : token $type:literal $spec:literal) => {
-    Param {
-      semantic: Some($semantic.to_string()),
-      name: $identifier.to_string(),
-      type_name: $type.to_string(),
-      is_token: true,
-      is_optional: false,
-      match_literal: Some($spec.to_string()),
-    }
-  };
-  (($semantic:literal) $identifier:literal : optional token $type:literal $spec:literal) => {
-    Param {
-      semantic: Some($semantic.to_string()),
-      name: $identifier.to_string(),
-      type_name: $type.to_string(),
-      is_token: true,
-      is_optional: true,
-      match_literal: Some($spec.to_string()),
-    }
-  };
-}
-pub(crate) use param;

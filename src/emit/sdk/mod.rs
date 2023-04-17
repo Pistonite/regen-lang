@@ -1,14 +1,14 @@
 mod rust;
-pub use rust::RustEmitter;
-use crate::emit::Emitter;
-use crate::sdk::Environment;
-use crate::sdk::generated::Env;
 use crate::core::Language;
-
+use crate::emit::Emitter;
+use crate::sdk::generated::Env;
+use crate::sdk::Environment;
+pub use rust::RustEmitter;
 
 pub fn emit_sdk<E>(env: &mut Env, emitter: E) -> Result<Option<String>, Box<dyn std::error::Error>>
-where E: Emitter
- {
+where
+  E: Emitter,
+{
   // Parse the input file and convert it to language
   let lang = match env.parse_pts_then(Language::try_from) {
     Ok(r) => r,

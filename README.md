@@ -1,14 +1,22 @@
-highlight_tokens: tokenize and return highlighted blocks. fastest, won't have semantic information or parsed object
-returns: Vec<CodeBlock>
-highlight_semantic_one: tokenize and return semantic-highlighted blocks with information from the AST. slower, will have semantic information from the AST
-  one means it will stop after the first AST is generated, and discard the rest of the tokens
-returns: Vec<CodeBlock>, Option<ASTTarget>
-highlight_semantic: tokenize and return semantic-highlighted blocks with information from the AST. slower, will have semantic information from the AST
-  this will keep generating ASTs until it has parsed the entire token stream
-  if AST cannot be generated, it will skip one toke and try again
-returns: Vec<CodeBlock>, Vec<ASTTarget>, Vec<ParserError>
+# regen-lang
+Regen is a language that defines languages. The `regen` compiler generates a parser for the language defined with the Regen language in supported general-purpose programming languages:
+- Rust
+- TypeScript (TODO)
+- Python (maybe)
+- C++ (maybe)
 
-parse_one: generate PT from the first AST. slowest, will have parsed object and accurate semantic-highlighted blocks
-returns: Option<PTTarget>, Option<ASTTarget>, Vec<CodeBlock>, Vec<ParserError>
-parse: generate PT from all ASTs. slowest, will have parsed object and accurate semantic-highlighted blocks
-returns: Vec<PTTarget>, Vec<ASTTarget>, Vec<CodeBlock>, Vec<ParserError>
+Regen is suitable for small application-specific grammars. It is meant to replace `parse(cmd.split(" "))` with a more robust and easy-to-use parser. It is not meant to replace full-fledged parsers for existing programming languages, as those are more optimized and have more features like error recovery and better error messages.
+
+## Features
+- Regen defines LL (Left-to-right, Leftmost derivation) grammars.
+- Lexer/Tokenizer parses tokens with regular expressions (basically DFA)
+- Semantic annotations are built-in to the Abstract Syntax Tree.
+- The Parse Tree nodes can be hooked with custom code to directly generate application-specific objects without the need for a separate pass.
+- The generated parser API is type-safe (if the target language supports it).
+- Syntax coloring to HTML, with optional classname mappings so you can use any existing theme.
+
+## Syntax
+[Here](https://regen.pistonite.org/regen_syntax) is the grammar of Regen, defined in Regen, and highlighted with the generated parser with a [Prism.js](https://prismjs.com/) theme.
+
+## Documentation
+TODO...

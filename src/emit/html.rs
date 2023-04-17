@@ -1,5 +1,5 @@
 use crate::sdk::generated::{Sem, Tok};
-use crate::sdk::{Semantic, RootParser, Environment};
+use crate::sdk::{Environment, RootParser, Semantic};
 
 const TAG_TOKENIZE: &str = "<!-- INCLUDE_REGEN_TOKENIZE -->";
 const TAG_AST_SEMANTIC: &str = "<!-- INCLUDE_REGEN_AST_SEMANTIC -->";
@@ -8,7 +8,7 @@ const TAG_FULL_SEMANTIC: &str = "<!-- INCLUDE_REGEN_FULL_SEMANTIC -->";
 pub fn emit_html<E, F, S>(env: &mut E, template_html: &str, semantic_mapping: F) -> String
 where
   S: Semantic + Clone,
-  E: Environment<S=S> + RootParser,
+  E: Environment<S = S> + RootParser,
   F: Fn(&S) -> String,
 {
   // This is an example of processing the input step-by-step
@@ -30,8 +30,8 @@ where
   // Here, it won't regenerate the AST. It will use the AST we created above
   // After PT is created, it is transfered to the consumer function where you can transform it
   // into the application object. Here we are just ignoring it, as we only need the semantic info.
-  let _ = env.parse_pts_then(|_|Ok(()));
-  
+  let _ = env.parse_pts_then(|_| Ok(()));
+
   let full_html = env.as_ctx().si.get_html(&semantic_mapping);
 
   // Inject the html into the template
@@ -39,7 +39,6 @@ where
     .replace(TAG_TOKENIZE, &tokenized_html)
     .replace(TAG_AST_SEMANTIC, &ast_html)
     .replace(TAG_FULL_SEMANTIC, &full_html)
-
 }
 
 pub fn to_prismjs(s: &Sem) -> String {
@@ -57,7 +56,7 @@ pub fn to_prismjs(s: &Sem) -> String {
     Sem::SRule => "token class-name".to_owned(),
     Sem::SSemantic => "token tag".to_owned(),
     Sem::SHookName => "token function".to_owned(),
-    Sem::SHookType => "token class-name".to_owned(),
+    Sem::SHookType => "token regex".to_owned(),
     _ => s.to_html_class(),
   }
 }

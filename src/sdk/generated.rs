@@ -27,12 +27,12 @@ crate::sdk!(
   crate;
   target: TopLevelStatement;
   tokens: [
-    TComment,
     TKeyword,
     TIdentifier,
     TRegExp,
     TLiteral,
     TSymbol,
+    TComment,
   ];
   regex: [
     re0 = r"^\s+",
@@ -286,10 +286,11 @@ impl ast::DefineRuleStatement {
       m_body: Box::new(ast::RuleDefineBody::parse(ts)?),
     })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    if let Some(m) = self.m_hook_attr.as_ref() { m.apply_semantic(_si); }
-    _si.set(&self.m_rule_name, Sem::SRule);
-    self.m_body.apply_semantic(_si);
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_0, o.clone()); }
+    if let Some(m) = self.m_hook_attr.as_ref() { m.apply_semantic(si, _ovr); }
+    si.set(&self.m_rule_name, _ovr.as_ref().cloned().unwrap_or(Sem::SRule));
+    self.m_body.apply_semantic(si, _ovr);
   }
 }
 impl<'p> pt::DefineRuleStatement<'p> {
@@ -319,9 +320,12 @@ impl ast::HookAttribute {
       m_4: token!(TSymbol::")"(ts))?,
     })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    _si.set(&self.m_hook_name, Sem::SHookName);
-    _si.set(&self.m_hook_type, Sem::SHookType);
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_0, o.clone()); }
+    si.set(&self.m_hook_name, _ovr.as_ref().cloned().unwrap_or(Sem::SHookName));
+    if let Some(o) = _ovr { si.set(&self.m_2, o.clone()); }
+    si.set(&self.m_hook_type, _ovr.as_ref().cloned().unwrap_or(Sem::SHookType));
+    if let Some(o) = _ovr { si.set(&self.m_4, o.clone()); }
   }
 }
 impl<'p> pt::HookAttribute<'p> {
@@ -350,8 +354,10 @@ impl ast::UnionRuleBody {
       m_2: token!(TSymbol::";"(ts))?,
     })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    if let Some(m) = self.m_rules.as_ref() { m.apply_semantic(_si); }
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_0, o.clone()); }
+    if let Some(m) = self.m_rules.as_ref() { m.apply_semantic(si, _ovr); }
+    if let Some(o) = _ovr { si.set(&self.m_2, o.clone()); }
   }
 }
 impl<'p> pt::UnionRuleBody<'p> {
@@ -365,9 +371,9 @@ impl ast::UnionRuleList {
   fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
     Some(Self { m_first: token!(TIdentifier::parse(ts))?, m_rest: Box::new(optional!(ts, ast::UnionRuleListTail::parse(ts))), })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    _si.set(&self.m_first, Sem::SRule);
-    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    si.set(&self.m_first, _ovr.as_ref().cloned().unwrap_or(Sem::SRule));
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(si, _ovr); }
   }
 }
 impl<'p> pt::UnionRuleList<'p> {
@@ -388,9 +394,10 @@ impl ast::UnionRuleListTail {
       m_rest: Box::new(optional!(ts, ast::UnionRuleListTail::parse(ts))),
     })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    _si.set(&self.m_first, Sem::SRule);
-    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_0, o.clone()); }
+    si.set(&self.m_first, _ovr.as_ref().cloned().unwrap_or(Sem::SRule));
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(si, _ovr); }
   }
 }
 impl<'p> pt::UnionRuleListTail<'p> {
@@ -413,9 +420,12 @@ impl ast::FunctionalRuleBody {
       m_4: token!(TSymbol::";"(ts))?,
     })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    if let Some(m) = self.m_params.as_ref() { m.apply_semantic(_si); }
-    if let Some(m) = self.m_body.as_ref() { m.apply_semantic(_si); }
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_0, o.clone()); }
+    if let Some(m) = self.m_params.as_ref() { m.apply_semantic(si, _ovr); }
+    if let Some(o) = _ovr { si.set(&self.m_2, o.clone()); }
+    if let Some(m) = self.m_body.as_ref() { m.apply_semantic(si, _ovr); }
+    if let Some(o) = _ovr { si.set(&self.m_4, o.clone()); }
   }
 }
 impl<'p> pt::FunctionalRuleBody<'p> {
@@ -429,9 +439,9 @@ impl ast::ParamList {
   fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
     Some(Self { m_first: Box::new(ast::Parameter::parse(ts)?), m_rest: Box::new(optional!(ts, ast::ParamListTail::parse(ts))), })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    self.m_first.apply_semantic(_si);
-    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    self.m_first.apply_semantic(si, _ovr);
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(si, _ovr); }
   }
 }
 impl<'p> pt::ParamList<'p> {
@@ -456,9 +466,10 @@ impl ast::ParamListTail {
       m_rest: Box::new(optional!(ts, ast::ParamListTail::parse(ts))),
     })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    self.m_first.apply_semantic(_si);
-    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_0, o.clone()); }
+    self.m_first.apply_semantic(si, _ovr);
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(si, _ovr); }
   }
 }
 impl<'p> pt::ParamListTail<'p> {
@@ -480,10 +491,11 @@ impl ast::Parameter {
       m_type: Box::new(optional!(ts, ast::RuleType::parse(ts))),
     })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    if let Some(m) = self.m_sem_attr.as_ref() { m.apply_semantic(_si); }
-    _si.set(&self.m_variable, Sem::SVariable);
-    if let Some(m) = self.m_type.as_ref() { m.apply_semantic(_si); }
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(m) = self.m_sem_attr.as_ref() { m.apply_semantic(si, _ovr); }
+    si.set(&self.m_variable, _ovr.as_ref().cloned().unwrap_or(Sem::SVariable));
+    if let Some(o) = _ovr { si.set(&self.m_2, o.clone()); }
+    if let Some(m) = self.m_type.as_ref() { m.apply_semantic(si, _ovr); }
   }
 }
 impl<'p> pt::Parameter<'p> {
@@ -511,8 +523,10 @@ impl ast::ParamSemantic {
       m_2: token!(TSymbol::")"(ts))?,
     })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    if let Some(m) = &self.m_semantic_name { _si.set(m, Sem::SSemantic); }
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_0, o.clone()); }
+    if let Some(m) = &self.m_semantic_name { si.set(m, _ovr.as_ref().cloned().unwrap_or(Sem::SSemantic)); }
+    if let Some(o) = _ovr { si.set(&self.m_2, o.clone()); }
   }
 }
 impl<'p> pt::ParamSemantic<'p> {
@@ -530,7 +544,11 @@ impl ast::RuleType {
       m_token_content: optional!(ts, token!(TLiteral::parse(ts))),
     })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(m) = &self.m_kw_optional { if let Some(o) = _ovr { si.set(m, o.clone()); } }
+    if let Some(m) = &self.m_kw_token { if let Some(o) = _ovr { si.set(m, o.clone()); } }
+    if let Some(o) = _ovr { si.set(&self.m_id, o.clone()); }
+    if let Some(m) = &self.m_token_content { if let Some(o) = _ovr { si.set(m, o.clone()); } }
   }
 }
 impl<'p> pt::RuleType<'p> {
@@ -552,8 +570,9 @@ impl ast::TopLevelDefineStatement {
   fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
     Some(Self { m_body: Box::new(ast::TopLevelDefine::parse(ts)?), m_1: token!(TSymbol::";"(ts))?, })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    self.m_body.apply_semantic(_si);
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    self.m_body.apply_semantic(si, _ovr);
+    if let Some(o) = _ovr { si.set(&self.m_1, o.clone()); }
   }
 }
 impl<'p> pt::TopLevelDefineStatement<'p> {
@@ -577,8 +596,10 @@ impl ast::DefineTokenTypeStatement {
       m_token_type: token!(TIdentifier::parse(ts))?,
     })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    _si.set(&self.m_token_type, Sem::SToken);
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(m) = &self.m_kw_extract { if let Some(o) = _ovr { si.set(m, o.clone()); } }
+    if let Some(o) = _ovr { si.set(&self.m_1, o.clone()); }
+    si.set(&self.m_token_type, _ovr.as_ref().cloned().unwrap_or(Sem::SToken));
   }
 }
 impl<'p> pt::DefineTokenTypeStatement<'p> {
@@ -596,8 +617,9 @@ impl ast::DefineIgnoreTokenRuleStatement {
   fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
     Some(Self { m_0: token!(TKeyword::"ignore"(ts))?, m_value: Box::new(ast::LiteralOrRegExp::parse(ts)?), })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    self.m_value.apply_semantic(_si);
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_0, o.clone()); }
+    self.m_value.apply_semantic(si, _ovr);
   }
 }
 impl<'p> pt::DefineIgnoreTokenRuleStatement<'p> {
@@ -614,9 +636,9 @@ impl ast::DefineTokenRuleStatement {
   fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
     Some(Self { m_token_type: token!(TIdentifier::parse(ts))?, m_value: Box::new(ast::LiteralOrRegExp::parse(ts)?), })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    _si.set(&self.m_token_type, Sem::SToken);
-    self.m_value.apply_semantic(_si);
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    si.set(&self.m_token_type, _ovr.as_ref().cloned().unwrap_or(Sem::SToken));
+    self.m_value.apply_semantic(si, _ovr);
   }
 }
 impl<'p> pt::DefineTokenRuleStatement<'p> {
@@ -635,7 +657,8 @@ impl ast::TokenLiteral {
   fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
     Some(Self { m_t: token!(TLiteral::parse(ts))?, })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_t, o.clone()); }
   }
 }
 impl<'p> pt::TokenLiteral<'p> {
@@ -648,7 +671,8 @@ impl ast::TokenRegExp {
   fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
     Some(Self { m_t: token!(TRegExp::parse(ts))?, })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_t, o.clone()); }
   }
 }
 impl<'p> pt::TokenRegExp<'p> {
@@ -661,8 +685,9 @@ impl ast::DefineSemanticStatement {
   fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
     Some(Self { m_0: token!(TKeyword::"semantic"(ts))?, m_id: token!(TIdentifier::parse(ts))?, })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    _si.set(&self.m_id, Sem::SSemantic);
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_0, o.clone()); }
+    si.set(&self.m_id, _ovr.as_ref().cloned().unwrap_or(Sem::SSemantic));
   }
 }
 impl<'p> pt::DefineSemanticStatement<'p> {
@@ -686,9 +711,9 @@ impl ast::ConcatExpression {
   fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
     Some(Self { m_first: token!(TIdentifier::parse(ts))?, m_rest: Box::new(optional!(ts, ast::ConcatExpressionTail::parse(ts))), })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    _si.set(&self.m_first, Sem::SVariable);
-    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    si.set(&self.m_first, _ovr.as_ref().cloned().unwrap_or(Sem::SVariable));
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(si, _ovr); }
   }
 }
 impl<'p> pt::ConcatExpression<'p> {
@@ -705,8 +730,9 @@ impl ast::ConcatExpressionTail {
   fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
     Some(Self { m_0: token!(TSymbol::"|"(ts))?, m_rest: Box::new(ast::ConcatExpression::parse(ts)?), })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    self.m_rest.apply_semantic(_si);
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_0, o.clone()); }
+    self.m_rest.apply_semantic(si, _ovr);
   }
 }
 impl<'p> pt::ConcatExpressionTail<'p> {
@@ -724,8 +750,10 @@ impl ast::DictExpression {
       m_2: token!(TSymbol::"}"(ts))?,
     })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    if let Some(m) = self.m_values.as_ref() { m.apply_semantic(_si); }
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_0, o.clone()); }
+    if let Some(m) = self.m_values.as_ref() { m.apply_semantic(si, _ovr); }
+    if let Some(o) = _ovr { si.set(&self.m_2, o.clone()); }
   }
 }
 impl<'p> pt::DictExpression<'p> {
@@ -739,9 +767,9 @@ impl ast::VariableList {
   fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
     Some(Self { m_first: token!(TIdentifier::parse(ts))?, m_rest: Box::new(optional!(ts, ast::VariableListTail::parse(ts))), })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    _si.set(&self.m_first, Sem::SVariable);
-    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    si.set(&self.m_first, _ovr.as_ref().cloned().unwrap_or(Sem::SVariable));
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(si, _ovr); }
   }
 }
 impl<'p> pt::VariableList<'p> {
@@ -758,8 +786,9 @@ impl ast::VariableListTail {
   fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {
     Some(Self { m_0: token!(TSymbol::","(ts))?, m_rest: Box::new(optional!(ts, ast::VariableList::parse(ts))), })
   }
-  fn apply_semantic(&self, _si: &mut SemInfo) {
-    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(_si); }
+  fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {
+    if let Some(o) = _ovr { si.set(&self.m_0, o.clone()); }
+    if let Some(m) = self.m_rest.as_ref() { m.apply_semantic(si, _ovr); }
   }
 }
 impl<'p> pt::VariableListTail<'p> {

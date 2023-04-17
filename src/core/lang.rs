@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::emit::Emitter;
 use crate::sdk::generated::{ast, pt};
 use crate::sdk::Error;
-use crate::emit::Emitter;
 use crate::tree_cast;
 
 use super::rule::{RetType, Rule, RuleValue};
@@ -26,7 +26,10 @@ pub struct Language {
 }
 
 impl Language {
-  pub fn emit_sdk<E>(&self, mut emitter: E) -> Result<String, Box<dyn std::error::Error>> where E: Emitter{
+  pub fn emit_sdk<E>(&self, mut emitter: E) -> Result<String, Box<dyn std::error::Error>>
+  where
+    E: Emitter,
+  {
     emitter.start(self)?;
     for stmt in &self.stmts {
       match stmt {
@@ -49,14 +52,7 @@ impl TryFrom<Vec<pt::TopLevelStatement<'_>>> for Language {
     validate_references(&pt)?;
 
     // If good, take out objects from PT
-    let (
-      target,
-      stmts,
-      tokens,
-      token_rules, 
-      rules,
-      rule_asts,
-    ) = extract_from_pt(pt);
+    let (target, stmts, tokens, token_rules, rules, rule_asts) = extract_from_pt(pt);
 
     // We need at least 1 rule
     let mut errors = Vec::new();
@@ -67,8 +63,8 @@ impl TryFrom<Vec<pt::TopLevelStatement<'_>>> for Language {
           "Define a rule with the \"rule\" keyword.".to_owned(),
         ));
         return Err(errors);
-      },
-      Some(x) => x
+      }
+      Some(x) => x,
     };
 
     // Resolve return types
@@ -111,9 +107,7 @@ impl TryFrom<Vec<pt::TopLevelStatement<'_>>> for Language {
   }
 }
 
-fn validate_references(
-  pt: &[pt::TopLevelStatement],
-) -> Result<() /* semantics */, Vec<Error>> {
+fn validate_references(pt: &[pt::TopLevelStatement]) -> Result<() /* semantics */, Vec<Error>> {
   let mut errors = Vec::new();
 
   let mut token_names = HashSet::new();
@@ -274,7 +268,7 @@ fn extract_from_pt(
   Vec<TokenDef>,
   Vec<TokenRule>,
   HashMap<String, Rule>,
-  HashMap<String, &ast::DefineRuleStatement>
+  HashMap<String, &ast::DefineRuleStatement>,
 ) {
   let mut target = None;
   let mut stmts = Vec::new();
@@ -285,28 +279,26 @@ fn extract_from_pt(
 
   for pt in pt {
     match pt {
-      pt::TopLevelStatement::TopLevelDefineStatement(stmt) => {
-        match *stmt.m_body {
-          pt::TopLevelDefine::DefineTokenTypeStatement(mut token_def) => {
-            stmts.push(Stmt::Token(tokens.len()));
-            tokens.push(token_def.take_unchecked());
-          }
-          pt::TopLevelDefine::DefineSemanticStatement(mut semantic) => {
-            stmts.push(Stmt::Semantic(semantic.take_unchecked()));
-          }
-          pt::TopLevelDefine::DefineTokenRuleStatement(mut token_rule) => {
-            stmts.push(Stmt::TokenRule(token_rules.len()));
-            token_rules.push(token_rule.take_unchecked());
-          }
-          pt::TopLevelDefine::DefineIgnoreTokenRuleStatement(mut token_rule) => {
-            stmts.push(Stmt::TokenRule(token_rules.len()));
-            token_rules.push(token_rule.take_unchecked());
-          }
-          pt::TopLevelDefine::TokenLiteral(include) => {
-            stmts.push(Stmt::Include(super::strip_quotes(&include.m_t)));
-          }
+      pt::TopLevelStatement::TopLevelDefineStatement(stmt) => match *stmt.m_body {
+        pt::TopLevelDefine::DefineTokenTypeStatement(mut token_def) => {
+          stmts.push(Stmt::Token(tokens.len()));
+          tokens.push(token_def.take_unchecked());
         }
-      }
+        pt::TopLevelDefine::DefineSemanticStatement(mut semantic) => {
+          stmts.push(Stmt::Semantic(semantic.take_unchecked()));
+        }
+        pt::TopLevelDefine::DefineTokenRuleStatement(mut token_rule) => {
+          stmts.push(Stmt::TokenRule(token_rules.len()));
+          token_rules.push(token_rule.take_unchecked());
+        }
+        pt::TopLevelDefine::DefineIgnoreTokenRuleStatement(mut token_rule) => {
+          stmts.push(Stmt::TokenRule(token_rules.len()));
+          token_rules.push(token_rule.take_unchecked());
+        }
+        pt::TopLevelDefine::TokenLiteral(include) => {
+          stmts.push(Stmt::Include(super::strip_quotes(&include.m_t)));
+        }
+      },
       pt::TopLevelStatement::DefineRuleStatement(mut rule) => {
         let ast = rule.as_ref().pt.ast;
         let rule = rule.take_unchecked();

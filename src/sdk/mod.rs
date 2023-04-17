@@ -5,9 +5,9 @@ pub use util::{Error, ParseHook};
 mod token;
 pub use token::{TokenImpl, TokenStream, Tokenizer, TokenizerAction};
 mod semantic;
-pub use semantic::{Semantic, SemInfoImpl, Span};
+pub use semantic::{SemInfoImpl, Semantic, Span};
 mod env;
-pub use env::{EnvImpl, EnvMode, Environment, RootParser, ContextImpl};
+pub use env::{ContextImpl, EnvImpl, EnvMode, Environment, RootParser};
 
 pub mod gen;
 #[macro_export]

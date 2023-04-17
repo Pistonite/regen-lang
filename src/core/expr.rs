@@ -57,17 +57,3 @@ pub fn parse_expr(pt: &pt::Expression, _si: &mut SemInfo, errors: &mut Vec<Error
     }
   }
 }
-
-macro_rules! expr {
-    ($t:ident) => {
-        Expr::Var(stringify!($t).to_owned())
-    };
-    ($( $t:ident)|* ) => {
-        Expr::Concat(vec![ $( stringify!($t).to_owned() ),*])
-    };
-    {$( $t:ident),* } => {
-        Expr::Dict(vec![ $( stringify!($t).to_owned() ),*])
-    };
-
-}
-pub(crate) use expr;

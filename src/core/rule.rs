@@ -543,21 +543,3 @@ impl RetType {
     }
   }
 }
-
-macro_rules! rule {
-  ($identifier:literal, $value:expr) => {
-    Rule {
-      name: $identifier.to_owned(),
-      hook: None,
-      value: $value,
-    }
-  };
-  ($identifier:literal, $value:expr, $hook:expr) => {
-    Rule {
-      name: $identifier.to_owned(),
-      hook: Some($hook),
-      value: $value,
-    }
-  };
-}
-pub(crate) use rule;

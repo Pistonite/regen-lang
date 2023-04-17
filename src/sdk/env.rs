@@ -5,7 +5,7 @@ pub trait RootParser {
   type S: Semantic<T = Self::T>;
   type A;
   type P<'p>;
-  fn do_tokenize(src:&str, si: &mut SemInfoImpl<Self::S>) -> Vec<TokenImpl<Self::T>>;
+  fn do_tokenize(src: &str, si: &mut SemInfoImpl<Self::S>) -> Vec<TokenImpl<Self::T>>;
   fn parse_ast_root(
     ts: &mut TokenStream<Self::T>,
     si: &mut SemInfoImpl<Self::S>,
@@ -28,7 +28,8 @@ pub trait Environment {
   fn parse_pts_then<'s, 'p, P, F, R>(&'s mut self, consumer: F) -> Result<R, &[Error]>
   where
     F: FnOnce(Vec<<Self as RootParser>::P<'p>>) -> Result<R, Vec<Error>>,
-    Self: RootParser<P<'p> = P>, 's: 'p;
+    Self: RootParser<P<'p> = P>,
+    's: 'p;
 }
 
 pub struct ContextImpl<C, S>
@@ -74,13 +75,13 @@ where
   asts: Vec<A>,
 }
 
-impl<T, S, A, C> Into<ContextImpl<C,S>> for EnvImpl<T, S, A, C>
+impl<T, S, A, C> Into<ContextImpl<C, S>> for EnvImpl<T, S, A, C>
 where
   T: Clone,
   S: Semantic<T = T> + Clone,
-  Self: RootParser<T = T, A=A,S=S>,
+  Self: RootParser<T = T, A = A, S = S>,
 {
-  fn into(self) -> ContextImpl<C,S> {
+  fn into(self) -> ContextImpl<C, S> {
     self.ctx
   }
 }
@@ -89,7 +90,7 @@ impl<T, S, A> EnvImpl<T, S, A, ()>
 where
   T: Clone,
   S: Semantic<T = T> + Clone,
-  Self: RootParser<T = T, A=A,S=S>,
+  Self: RootParser<T = T, A = A, S = S>,
 {
   pub fn new(source_code: &str, mode: EnvMode, stack_size: usize) -> Self {
     Self::new_ctx(source_code, mode, stack_size, ())
@@ -100,7 +101,7 @@ impl<T, S, A, C> EnvImpl<T, S, A, C>
 where
   T: Clone,
   S: Semantic<T = T> + Clone,
-  Self: RootParser<T = T, A=A,S=S>,
+  Self: RootParser<T = T, A = A, S = S>,
 {
   /// Create new environment for parsing the source code
   pub fn new_ctx(source_code: &str, mode: EnvMode, stack_size: usize, context: C) -> Self {
@@ -125,7 +126,7 @@ impl<T, S, A, C> Environment for EnvImpl<T, S, A, C>
 where
   T: Clone,
   S: Semantic<T = T> + Clone,
-  Self: RootParser<T = T, A=A,S=S>,
+  Self: RootParser<T = T, A = A, S = S>,
 {
   type T = T;
   type S = S;
@@ -196,7 +197,7 @@ where
   fn parse_pts_then<'s, 'p, P, F, R>(&'s mut self, consumer: F) -> Result<R, &[Error]>
   where
     F: FnOnce(Vec<<Self as RootParser>::P<'p>>) -> Result<R, Vec<Error>>,
-    's: 'p
+    's: 'p,
   {
     self.parse_asts();
     if !self.ctx.err.is_empty() {
@@ -204,7 +205,6 @@ where
     }
 
     let mut pts = Vec::new();
-
 
     for ast in &self.asts {
       let pt = Self::parse_pt_root(ast, &mut self.ctx.si, &mut self.ctx.err);

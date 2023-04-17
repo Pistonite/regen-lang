@@ -46,13 +46,3 @@ pub fn parse_hook(
     return_type: super::strip_quotes(&pt.m_hook_type),
   })
 }
-
-macro_rules! hook {
-  ($name:literal : $type:literal) => {
-    Hook {
-      name: $name.to_owned(),
-      return_type: $type.to_owned(),
-    }
-  };
-}
-pub(crate) use hook;

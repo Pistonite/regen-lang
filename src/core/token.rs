@@ -90,40 +90,7 @@ pub fn parse_token_rule(
     )),
     pt::LiteralOrRegExp::TokenRegExp(regexp) => Some(TokenRule::RegExp(
       pt.m_token_type.clone(),
-      super::strip_slashes(&regexp.m_t)
+      super::strip_slashes(&regexp.m_t),
     )),
   }
 }
-
-macro_rules! token {
-  ($name:ident) => {
-    TokenDef {
-      name: stringify!($name).to_owned(),
-      is_extract: false,
-    }
-  };
-  (extract $name:ident) => {
-    TokenDef {
-      name: stringify!($name).to_owned(),
-      is_extract: true,
-    }
-  };
-}
-pub(crate) use token;
-
-macro_rules! tokenrule {
-  (ignore $pat:literal) => {
-    TokenRule::IgnoreLiteral($pat.to_owned())
-  };
-  (ignore regex $pat:literal) => {
-    TokenRule::IgnoreRegExp($pat.to_owned())
-  };
-  ($name:ident $pat:literal) => {
-    TokenRule::Literal(stringify!($name).to_owned(), $pat.to_owned())
-  };
-  ($name:ident regex $pat:literal) => {
-    TokenRule::RegExp(stringify!($name).to_owned(), $pat.to_owned())
-  };
-}
-
-pub(crate) use tokenrule;

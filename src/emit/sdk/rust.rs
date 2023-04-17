@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::env::var;
-use std::fmt::{format, Write};
+use std::fmt::Write;
 use std::path::PathBuf;
 
 use clap::crate_version;
@@ -333,28 +332,55 @@ impl RustEmitter {
     }
   }
   fn get_ast_func_apply_semantic(&self, params: &Vec<Param>, member_names: Vec<String>) -> Code {
-    let start = "fn apply_semantic(&self, _si: &mut SemInfo) {".to_owned();
+    let start = "fn apply_semantic(&self, si: &mut SemInfo, _ovr: &Option<Sem>) {".to_owned();
     let end = "}".to_owned();
     let mut body = Vec::new();
 
     for (param, member) in params.iter().zip(member_names.iter()) {
       if !param.is_token {
-        if param.is_optional {
-          body.push(Code::Line(format!(
-            "if let Some(m) = self.{member}.as_ref() {{ m.apply_semantic(_si); }}"
-          )));
+        if let Some(s) = &param.semantic {
+          if param.is_optional {
+            body.push(Code::Line(format!(
+              "if let Some(m) = self.{member}.as_ref() {{ m.apply_semantic(si, Some(Sem::{s})); }}"
+            )));
+          } else {
+            body.push(Code::Line(format!(
+              "self.{member}.apply_semantic(si, Some(Sem::{s}));"
+            )));
+          }
         } else {
-          body.push(Code::Line(format!("self.{member}.apply_semantic(_si);")));
+          if param.is_optional {
+            body.push(Code::Line(format!(
+              "if let Some(m) = self.{member}.as_ref() {{ m.apply_semantic(si, _ovr); }}"
+            )));
+          } else {
+            body.push(Code::Line(format!(
+              "self.{member}.apply_semantic(si, _ovr);"
+            )));
+          }
         }
       } else {
         if let Some(s) = &param.semantic {
-          let s = self.semantic_name(s);
+          let s = format!(
+            "_ovr.as_ref().cloned().unwrap_or(Sem::{s})",
+            s = self.semantic_name(s)
+          );
           if param.is_optional {
             body.push(Code::Line(format!(
-              "if let Some(m) = &self.{member} {{ _si.set(m, Sem::{s}); }}"
+              "if let Some(m) = &self.{member} {{ si.set(m, {s}); }}"
             )));
           } else {
-            body.push(Code::Line(format!("_si.set(&self.{member}, Sem::{s});")));
+            body.push(Code::Line(format!("si.set(&self.{member}, {s});")));
+          }
+        } else {
+          if param.is_optional {
+            body.push(Code::Line(format!(
+              "if let Some(m) = &self.{member} {{ if let Some(o) = _ovr {{ si.set(m, o.clone()); }} }}"
+            )));
+          } else {
+            body.push(Code::Line(format!(
+              "if let Some(o) = _ovr {{ si.set(&self.{member}, o.clone()); }}"
+            )));
           }
         }
       }
@@ -431,7 +457,7 @@ impl RustEmitter {
 
     let pt_t = self.pt_inner_type(&rule.name, false);
     let ast_ns_t = self.ast(&rule.name, true);
-    
+
     let ret_type = lang.ret_types.get(&rule.name).unwrap();
 
     // Struct declaration
@@ -466,124 +492,137 @@ impl RustEmitter {
       }
     };
     self.pt_block.push(struct_block);
-    
 
-    
     let parse_block = {
       let func_name = self.pt_parse_func_name(rule);
       let start = format!("fn {func_name}(ast: &'p {ast_ns_t}, _si: &mut SemInfo, _errors: &mut Vec<Error>) -> Self {{");
       let mut body = vec![];
       let vars = body_expr.get_vars();
-      
+
       // Parse members
 
-    for var in vars {
-      let member = param_members.get(&var).unwrap();
-      let var_type = param_types.get(&var).unwrap();
-      let l = match var_type {
-        ParamType::Item(optional, name) => {
-          let pt_ns_t = self.pt_inner_type(name, true);
-          if *optional {
-            format!("let {member} = if let Some(v) = ast.{member}.as_ref() {{ Box::new(Some({pt_ns_t}::from_ast(v, _si, _errors))) }} else {{ Box::new(None) }};")
-          } else {
-            format!("let {member} = Box::new({pt_ns_t}::from_ast(&ast.{member}.as_ref(), _si, _errors));")
+      for var in vars {
+        let member = param_members.get(&var).unwrap();
+        let var_type = param_types.get(&var).unwrap();
+        let l = match var_type {
+          ParamType::Item(optional, name) => {
+            let pt_ns_t = self.pt_inner_type(name, true);
+            if *optional {
+              format!("let {member} = if let Some(v) = ast.{member}.as_ref() {{ Box::new(Some({pt_ns_t}::from_ast(v, _si, _errors))) }} else {{ Box::new(None) }};")
+            } else {
+              format!("let {member} = Box::new({pt_ns_t}::from_ast(&ast.{member}.as_ref(), _si, _errors));")
+            }
           }
-        }
-        ParamType::String(optional) => {
-          if *optional {
-            format!("let {member} = ast.{member}.as_ref().map(|t| t.value.clone());")
-          } else {
-            format!("let {member} = ast.{member}.value.clone();")
+          ParamType::String(optional) => {
+            if *optional {
+              format!("let {member} = ast.{member}.as_ref().map(|t| t.value.clone());")
+            } else {
+              format!("let {member} = ast.{member}.value.clone();")
+            }
           }
-        }
-        ParamType::Bool => {
-          format!("let {member} = !ast.{member}.is_none();")
-        }
-      };
-      body.push(Code::Line(l));
-    }
+          ParamType::Bool => {
+            format!("let {member} = !ast.{member}.is_none();")
+          }
+        };
+        body.push(Code::Line(l));
+      }
       // Execute body expression
 
-    match &body_expr {
-      Expr::Concat(vars) => {
-        // return a concatenation
-        // implementation: move the asts and vals over, push_front the rest
-        let last = vars.last().unwrap();
-        let last_type = param_types.get(last).unwrap();
-        let last_member = param_members.get(last).unwrap();
+      match &body_expr {
+        Expr::Concat(vars) => {
+          // return a concatenation
+          // implementation: move the asts and vals over, push_front the rest
+          let last = vars.last().unwrap();
+          let last_type = param_types.get(last).unwrap();
+          let last_member = param_members.get(last).unwrap();
 
-        let move_macro = if last_type.is_optional() {
-          "move_pt_vec_optional"
-        } else {
-          "move_pt_vec"
-        };
-        body.push(Code::Line(format!("let (mut asts, mut vals) = {move_macro}!({last_member});")));
+          let move_macro = if last_type.is_optional() {
+            "move_pt_vec_optional"
+          } else {
+            "move_pt_vec"
+          };
+          body.push(Code::Line(format!(
+            "let (mut asts, mut vals) = {move_macro}!({last_member});"
+          )));
 
-        // push the vars in reverse order to the front of the vec
-        for var in vars.iter().rev().skip(1) {
-          let var_type = param_types.get(var).unwrap();
-          let member = param_members.get(var).unwrap();
+          // push the vars in reverse order to the front of the vec
+          for var in vars.iter().rev().skip(1) {
+            let var_type = param_types.get(var).unwrap();
+            let member = param_members.get(var).unwrap();
 
-          match var_type {
-            ParamType::Item(optional, _) => {
-              body.push(Code::Line(format!("vals.push_front(*{member});")));
-              if *optional {
-                body.push(Code::Line(format!("asts.push_front(ast.{member}.as_ref());")));
-              } else {
-                body.push(Code::Line(format!("asts.push_front(&ast.{member});")));
+            match var_type {
+              ParamType::Item(optional, _) => {
+                body.push(Code::Line(format!("vals.push_front(*{member});")));
+                if *optional {
+                  body.push(Code::Line(format!(
+                    "asts.push_front(ast.{member}.as_ref());"
+                  )));
+                } else {
+                  body.push(Code::Line(format!("asts.push_front(&ast.{member});")));
+                }
+              }
+              ParamType::String(optional) => {
+                body.push(Code::Line(format!("vals.push_front({member});")));
+                if *optional {
+                  body.push(Code::Line(format!(
+                    "asts.push_front(ast.{member}.as_ref());"
+                  )));
+                } else {
+                  body.push(Code::Line(format!("asts.push_front(&ast.{member});")));
+                }
+              }
+              ParamType::Bool => {
+                body.push(Code::Line(format!("vals.push_front({member});")));
+                body.push(Code::Line(format!(
+                  "asts.push_front(ast.{member}.as_ref());"
+                )));
               }
             }
-            ParamType::String(optional) => {
-              body.push(Code::Line(format!("vals.push_front({member});")));
-              if *optional {
-                body.push(Code::Line(format!("asts.push_front(ast.{member}.as_ref());")));
-              } else {
-                body.push(Code::Line(format!("asts.push_front(&ast.{member});")));
-              }
-            }
-            ParamType::Bool => {
-              body.push(Code::Line(format!("vals.push_front({member});")));
-              body.push(Code::Line(format!("asts.push_front(ast.{member}.as_ref());")));
-            }
           }
+          body.push(Code::Line("Self { ast, asts, vals }".to_owned()));
         }
-        body.push(Code::Line("Self { ast, asts, vals }".to_owned()));
-      }
-      Expr::Var(var) => {
-        let member = param_members.get(var).unwrap();
-        match ret_type {
-          RetType::Unit(_) => {
-            //return a single non-vec value
-        //    implementation: move the val over
-        body.push(Code::Line(format!("Self {{ ast, {member} }}")));
-          }
-          RetType::Vec(_) => {
-            //// 2. return a single vec value VecType = Vec, RetType = Param, Expr = Var
-        //    implementation: move the asts and vals over
-        let move_macro = if param_types.get(var).unwrap().is_optional() {
-          "move_pt_vec_optional"
-        } else {
-          "move_pt_vec"
-        };
-        body.push(Code::Line(format!("let (asts, vals) = {move_macro}!({member});")));
-           
-        body.push(Code::Line("Self { ast, asts, vals }".to_owned()));
-
-          }
-          _ => unreachable!(),
-        }
-      }
-      Expr::Dict(vars) => {
-        // 3. return a struct 
-        //    implementation: create the struct and move the val over
-        let mut struct_body = vec![Code::Line("ast,".to_owned())];
-        for var in vars {
+        Expr::Var(var) => {
           let member = param_members.get(var).unwrap();
-          struct_body.push(Code::Line(format!("{member},")));
+          match ret_type {
+            RetType::Unit(_) => {
+              //return a single non-vec value
+              //    implementation: move the val over
+              body.push(Code::Line(format!("Self {{ ast, {member} }}")));
+            }
+            RetType::Vec(_) => {
+              //// 2. return a single vec value VecType = Vec, RetType = Param, Expr = Var
+              //    implementation: move the asts and vals over
+              let move_macro = if param_types.get(var).unwrap().is_optional() {
+                "move_pt_vec_optional"
+              } else {
+                "move_pt_vec"
+              };
+              body.push(Code::Line(format!(
+                "let (asts, vals) = {move_macro}!({member});"
+              )));
+
+              body.push(Code::Line("Self { ast, asts, vals }".to_owned()));
+            }
+            _ => unreachable!(),
+          }
         }
-        body.push(Code::Block { indent: self.indent, inline: struct_body.len() <= 3, start: "Self {".to_owned(), body: struct_body, end: "}".to_owned() });
+        Expr::Dict(vars) => {
+          // 3. return a struct
+          //    implementation: create the struct and move the val over
+          let mut struct_body = vec![Code::Line("ast,".to_owned())];
+          for var in vars {
+            let member = param_members.get(var).unwrap();
+            struct_body.push(Code::Line(format!("{member},")));
+          }
+          body.push(Code::Block {
+            indent: self.indent,
+            inline: struct_body.len() <= 3,
+            start: "Self {".to_owned(),
+            body: struct_body,
+            end: "}".to_owned(),
+          });
+        }
       }
-    }
       Code::Block {
         indent: self.indent,
         inline: false,
@@ -599,14 +638,14 @@ impl RustEmitter {
       functions.push(hook_block);
     }
     let pt_ns_t = self.pt_inner_type(&rule.name, true);
-      let impl_block = Code::Block {
-        indent: self.indent,
-        inline: false,
-        start: format!("impl<'p> {pt_ns_t}<'p> {{"),
-        body: functions,
-        end: "}".to_owned(),
-      };
-      self.main_block.push(impl_block);
+    let impl_block = Code::Block {
+      indent: self.indent,
+      inline: false,
+      start: format!("impl<'p> {pt_ns_t}<'p> {{"),
+      body: functions,
+      end: "}".to_owned(),
+    };
+    self.main_block.push(impl_block);
   }
 
   fn emit_pt_union(&mut self, lang: &Language, rule: &Rule, type_defs: &Vec<String>) {
@@ -709,11 +748,11 @@ impl Emitter for RustEmitter {
       indent: self.indent,
       inline: false,
       start: "/*".to_owned(),
-      body: vec![
-        Code::Line(format!("Generated with regen-lang v{v}", v = crate_version!())),
-      ],
+      body: vec![Code::Line(format!(
+        "Generated with regen-lang v{v}",
+        v = crate_version!()
+      ))],
       end: "*/".to_owned(),
-    
     });
     Ok(())
   }
@@ -724,8 +763,7 @@ impl Emitter for RustEmitter {
       &mut self.main_block
     };
     target.push(Code::Line(format!("//// /* {path} */")));
-    target
-      .push(Code::Line(get_include_contents(&self.path, path)?));
+    target.push(Code::Line(get_include_contents(&self.path, path)?));
     target.push(Code::Line(format!("//// /* {path} */")));
     Ok(())
   }
@@ -761,7 +799,9 @@ impl Emitter for RustEmitter {
       // Emit the token rule
       match rule {
         TokenRule::IgnoreRegExp(_) => {
-          self.token_rule_block.push(Code::Line(format!("[{re_ident}],")));
+          self
+            .token_rule_block
+            .push(Code::Line(format!("[{re_ident}],")));
         }
         TokenRule::RegExp(name, _) => {
           let should_extract = self.extract_token_rules.contains(name);
@@ -813,14 +853,14 @@ impl Emitter for RustEmitter {
       let s: String = code.into();
       writeln!(output, "{}", s)?;
     }
-    
+
     let sdk_block = Code::Block {
       indent: self.indent,
       inline: false,
       start: format!("{crate_name}::sdk!("),
       body: vec![
         Code::Line(format!("{crate_name};")),
-        Code::Line(format!("target: {t};", t=&lang.target)),
+        Code::Line(format!("target: {t};", t = &lang.target)),
         Code::Block {
           indent: self.indent,
           inline: false,
@@ -860,9 +900,7 @@ impl Emitter for RustEmitter {
       inline: false,
       start: "pub mod ast {".to_owned(),
       body: {
-        let mut v = vec![
-          Code::Line("use super::*;".to_owned()),
-        ];
+        let mut v = vec![Code::Line("use super::*;".to_owned())];
         v.append(&mut self.ast_block);
         v
       },
@@ -876,9 +914,7 @@ impl Emitter for RustEmitter {
       inline: false,
       start: "pub mod pt {".to_owned(),
       body: {
-        let mut v = vec![
-          Code::Line("use super::*;".to_owned()),
-        ];
+        let mut v = vec![Code::Line("use super::*;".to_owned())];
         v.append(&mut self.pt_block);
         v
       },
@@ -893,6 +929,5 @@ impl Emitter for RustEmitter {
     }
 
     Ok(output)
-
   }
 }

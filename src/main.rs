@@ -71,8 +71,6 @@ fn write_output(contents: &str, location: &str) -> Result<(), std::io::Error> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-  // emit_self();
-  // return Ok(());
   let (errors, source) = match Cli::parse() {
     Cli::Html {
       input,
@@ -92,7 +90,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       let ctx: Ctx = env.into();
       (ctx.err, source)
     }
-    Cli::Sdk { target, input, output, stack_size } => {
+    Cli::Sdk {
+      target,
+      input,
+      output,
+      stack_size,
+    } => {
       let path = PathBuf::from(&input);
       let parent_path = path.parent().unwrap();
       let source = fs::read_to_string(input)?;
@@ -107,7 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(code) => {
           write_output(&code, &output)?;
           (vec![], source)
-        },
+        }
         None => {
           let ctx: Ctx = env.into();
           (ctx.err, source)
@@ -124,9 +127,4 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   }
 
   Ok(())
-}
-
-fn emit_self() {
-  let mut lang = regen::core::LangDef::make_test();
-  lang.emit_rust();
 }

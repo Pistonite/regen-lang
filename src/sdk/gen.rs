@@ -1,5 +1,3 @@
-
-
 /// Macro that implements the language SDK.
 /// This is used in the generated code to avoid code duplication.
 /// It also creates convenience macros for tree parsing.
@@ -85,7 +83,7 @@ macro_rules! sdk {
       fn parse_ast_root(ts: &mut TokenStream<Self::T>, si: &mut SemInfoImpl<Self::S>) -> Option<Self::A>{
         let ast = ast::$target::parse(ts);
         if let Some(ast) = &ast {
-          ast.apply_semantic(si);
+          ast.apply_semantic(si, &None);
         }
         ast
       }
@@ -294,9 +292,9 @@ macro_rules! impl_union {
         ts.pop();
         return None;
       }
-      fn apply_semantic(&self, si: &mut SemInfo) {
+      fn apply_semantic(&self, si: &mut SemInfo, ovr: &Option<Sem>) {
         match self {
-          $( Self::$derivation_type_name(r) => r.apply_semantic(si), )*
+          $( Self::$derivation_type_name(r) => r.apply_semantic(si, ovr), )*
         }
       }
     }

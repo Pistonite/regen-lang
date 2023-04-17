@@ -7,3 +7,4 @@ sdk:
 docs:
     mkdir -p target/docs
     cargo run html regen.regen.txt -o target/docs/test.html
+    cargo run html regen.regen.txt -t docs/regen_syntax.html.pp -o docs/regen_syntax.html

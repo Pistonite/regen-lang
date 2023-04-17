@@ -1,9 +1,9 @@
 [package]
 name = "regen-lang"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 description = "TODO description.."
-# repository = ""
+repository = "https://github.com/iTNTPiston/regen-lang"
 license = "GPL-3.0-or-later"
 authors = ["iTNTPiston <terrabyte100k@gmail.com>"]
 

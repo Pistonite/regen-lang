@@ -1,30 +1,37 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use std::collections::HashMap;
-use std::path::Path;
 use std::fs;
+use std::path::Path;
 mod html;
-pub use html::{to_prismjs, emit_html};
-mod visitor;
+pub use html::{emit_html, to_prismjs};
 mod code;
+mod visitor;
 pub use code::Code;
 mod sdk;
 pub use sdk::{emit_sdk, RustEmitter};
 
-use crate::core::{
-  Param, ParamType, RetType, 
-  Language,
-  TokenDef,
-  TokenRule,
-  Rule,
-};
+use crate::core::{Language, Param, ParamType, RetType, Rule, TokenDef, TokenRule};
 
 pub trait Emitter {
   fn start(&mut self, lang: &Language) -> Result<(), Box<dyn std::error::Error>>;
-  fn emit_include(&mut self, lang: &Language, path: &str)-> Result<(), Box<dyn std::error::Error>>;
-  fn emit_token(&mut self, lang: &Language, token: &TokenDef)-> Result<(), Box<dyn std::error::Error>>;
-  fn emit_token_rule(&mut self, lang: &Language, rule: &TokenRule)-> Result<(), Box<dyn std::error::Error>>;
-  fn emit_semantic(&mut self, lang: &Language, semantic: &str)-> Result<(), Box<dyn std::error::Error>>;
-  fn emit_rule(&mut self, lang: &Language, rule: &Rule)-> Result<(), Box<dyn std::error::Error>>;
+  fn emit_include(&mut self, lang: &Language, path: &str)
+    -> Result<(), Box<dyn std::error::Error>>;
+  fn emit_token(
+    &mut self,
+    lang: &Language,
+    token: &TokenDef,
+  ) -> Result<(), Box<dyn std::error::Error>>;
+  fn emit_token_rule(
+    &mut self,
+    lang: &Language,
+    rule: &TokenRule,
+  ) -> Result<(), Box<dyn std::error::Error>>;
+  fn emit_semantic(
+    &mut self,
+    lang: &Language,
+    semantic: &str,
+  ) -> Result<(), Box<dyn std::error::Error>>;
+  fn emit_rule(&mut self, lang: &Language, rule: &Rule) -> Result<(), Box<dyn std::error::Error>>;
   fn done(self, lang: &Language) -> Result<String, Box<dyn std::error::Error>>;
 }
 
