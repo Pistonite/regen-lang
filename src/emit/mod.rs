@@ -3,7 +3,6 @@ use std::path::Path;
 mod html;
 pub use html::{emit_html, to_prismjs};
 mod code;
-mod visitor;
 pub use code::Code;
 mod sdk;
 pub use sdk::{emit_sdk, RustEmitter};
@@ -35,8 +34,8 @@ pub trait Emitter {
 
 pub fn get_include_contents(from: &Path, path: &str) -> Result<String, Box<dyn std::error::Error>> {
   let p = from.join(path);
-  match fs::read_to_string(p) {
+  match fs::read_to_string(&p) {
     Ok(r) => Ok(r),
-    Err(e) => Err(format!("Error reading file {path}: {e}").into()),
+    Err(e) => Err(format!("Error reading file {p}: {e}", p=p.display()).into()),
   }
 }
