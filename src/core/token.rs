@@ -1,4 +1,7 @@
-use crate::sdk::grammar::{pt, Ctx, Sem};
+//! Core logic of tokens and token rules
+use crate::core::ExtractFromLiteral;
+use crate::grammar::{pt, Ctx, Tok};
+use crate::sdk::Error;
 
 /// Definition for a token type used by the tokenizer
 ///
@@ -7,7 +10,7 @@ use crate::sdk::grammar::{pt, Ctx, Sem};
 /// from the rest of the parsing process.
 ///
 /// Note that this should not be confused with the Token in the SDK, which is the token data structure at runtime when parsing.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TokenDef {
   /// Token type name
   pub name: String,
@@ -21,66 +24,71 @@ pub struct TokenDef {
 /// The longest token matched will be the next token produced.
 ///
 /// If a token cannot be matched, one character is skipped and added to the unmatchable token list.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TokenRule {
   /// Ignore rule matching a literal
   IgnoreLiteral(String /* literal */),
   /// Ignore rule matching a regular expression
   IgnoreRegExp(String /* regex */),
   /// Token rule matching a literal
-  Literal(String /* token_type */, String),
+  Literal(String /* token_type */, String /* literal */),
   /// Token rule matching a regular expression
-  RegExp(String /* token_type */, String),
+  RegExp(String /* token_type */, String /* regex */),
 }
 
-impl TokenRule {
-  pub fn get_regex(&self) -> Option<&str> {
-    match self {
-      TokenRule::IgnoreLiteral(_) => None,
-      TokenRule::IgnoreRegExp(regex) => Some(regex),
-      TokenRule::Literal(_, _) => None,
-      TokenRule::RegExp(_, regex) => Some(regex),
-    }
-  }
-}
-
-pub fn parse_token_def(pt: &pt::DefineTokenTypeStatement, ctx: &mut Ctx) -> Option<TokenDef> {
+pub fn parse_token_def(pt: &pt::DefineTokenTypeStatement, ctx: &mut Ctx) -> Option<()> {
   if pt.m_kw_extract {
     // Extracted tokens are not used in AST generation. Tag it to indicate that
-    ctx.si.set(
+    ctx.tbs.set(
       &pt.ast.m_token_type,
-      Sem::Tag("unused".to_owned(), Box::new(Sem::SToken)),
+      Tok::Decor {
+        tag: "unused".to_owned(),
+        base: Box::new(Tok::SToken),
+      },
     )
   }
-  Some(TokenDef {
+
+  if !ctx.val.add_token(TokenDef {
     name: pt.m_token_type.clone(),
     is_extract: pt.m_kw_extract,
-  })
+  }) {
+    let name = &pt.m_token_type;
+    let msg = format!("Duplicate token definition: {name}");
+    let help = "Remove or rename the duplicate definition".to_owned();
+    ctx
+      .err
+      .push(Error::from_token(&pt.ast.m_token_type, msg, help));
+  }
+  None
 }
 
 pub fn parse_token_ignore_rule(
   pt: &pt::DefineIgnoreTokenRuleStatement,
-  _: &mut Ctx,
-) -> Option<TokenRule> {
-  match pt.m_value.as_ref() {
+  ctx: &mut Ctx,
+) -> Option<()> {
+  let token_rule = match pt.m_value.as_ref() {
     pt::LiteralOrRegExp::TokenLiteral(literal) => {
-      Some(TokenRule::IgnoreLiteral(super::strip_quotes(&literal.m_t)))
+      TokenRule::IgnoreLiteral(literal.m_t.strip_quotes())
     }
     pt::LiteralOrRegExp::TokenRegExp(regexp) => {
-      Some(TokenRule::IgnoreRegExp(super::strip_slashes(&regexp.m_t)))
+      TokenRule::IgnoreRegExp(regexp.m_t.strip_and_escape_regex())
     }
-  }
+  };
+
+  ctx.val.add_token_rule(token_rule);
+  None
 }
 
-pub fn parse_token_rule(pt: &pt::DefineTokenRuleStatement, _: &mut Ctx) -> Option<TokenRule> {
-  match pt.m_value.as_ref() {
-    pt::LiteralOrRegExp::TokenLiteral(literal) => Some(TokenRule::Literal(
-      pt.m_token_type.clone(),
-      super::strip_quotes(&literal.m_t),
-    )),
-    pt::LiteralOrRegExp::TokenRegExp(regexp) => Some(TokenRule::RegExp(
-      pt.m_token_type.clone(),
-      super::strip_slashes(&regexp.m_t),
-    )),
-  }
+pub fn parse_token_rule(pt: &pt::DefineTokenRuleStatement, ctx: &mut Ctx) -> Option<()> {
+  let token_rule = match pt.m_value.as_ref() {
+    pt::LiteralOrRegExp::TokenLiteral(literal) => {
+      TokenRule::Literal(pt.m_token_type.clone(), literal.m_t.strip_quotes())
+    }
+    pt::LiteralOrRegExp::TokenRegExp(regexp) => {
+      TokenRule::RegExp(pt.m_token_type.clone(), regexp.m_t.strip_and_escape_regex())
+    }
+  };
+
+  ctx.val.add_token_rule(token_rule);
+  None
 }

@@ -1,11 +1,11 @@
-# regen-lang
+# ![](./docs/icon.svg) regen-lang
 Regen is a language that defines languages. The `regen` compiler generates a parser for the language defined with the Regen language in supported general-purpose programming languages:
 - Rust
-- TypeScript (TODO)
+- TypeScript (originally planned but not going to be worked on any time soon - use Rust WASM instead for now)
 - Python (maybe)
 - C++ (maybe)
 
-Regen is suitable for small application-specific grammars. It is meant to replace `parse(cmd.split(" "))` with a more robust and easy-to-use parser. It is not meant to replace full-fledged parsers for existing programming languages, as those are more optimized and have more features like error recovery and better error messages.
+Regen is suitable for small application-specific grammars, such as a custom string-interpolation function or a custom command parser. It is meant to replace `parse(cmd.split(" "))` with a more robust and easy-to-use parser. It is not meant to replace full-fledged parsers for existing programming languages, as those are more optimized and have more features like error recovery and better error messages.
 
 ## Features
 - Regen defines LL (Left-to-right, Leftmost derivation) grammars.
@@ -16,7 +16,17 @@ Regen is suitable for small application-specific grammars. It is meant to replac
 - Syntax coloring to HTML, with optional classname mappings so you can use any existing theme.
 
 ## Syntax
-[Here](https://regen.pistonite.org/regen_syntax) is the grammar of Regen, defined in Regen, and highlighted with the generated parser with a [Prism.js](https://prismjs.com/) theme.
+[Here](https://regen.pistonite.org) is the grammar of Regen, defined in Regen, and highlighted with the generated parser with a [Prism.js](https://prismjs.com/) theme.
 
-## Documentation
-TODO...
+## Installation
+Install the compiler
+```
+cargo install regen
+```
+
+If you are generating for Rust, you also need to add the library
+```
+cargo add regen-lang
+```
+
+Documentation on https://docs.rs/regen-lang.

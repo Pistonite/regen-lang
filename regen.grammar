@@ -1,7 +1,7 @@
 // Header
-"src/sdk/grammar.rs.pp";
+"src/grammar.rs.pp";
 
-context "Context";
+context "LangBuilder";
 
 /*===================================
   Tokenizer
@@ -38,7 +38,7 @@ Keyword "optional";
 Keyword "context";
 
 // Special Symbols
-Symbol /[{};|()=,:\.\[\]]/;
+Symbol /[{};|()=,:\.\[\]\+]/;
 
 // Identifier is alphanumeric and underscore, but does not start with digit
 Identifier /[_a-zA-Z]\w*/;
@@ -71,10 +71,10 @@ semantic ContextType;
 // The parser can be configured to generate one root node,
 // or keep generating root nodes until the end of the file.
 
-rule TopLevelStatement(body: TopLevelDefine, _: token Symbol";") body;
+rule TopLevelStatement(body: TopLevelDefine, _: token Symbol";");
 
 rule TopLevelDefine = 
-  TokenLiteral
+  DefineIncludeStatement
   | DefineContextStatement
   | DefineRuleStatement
   | DefineTokenTypeStatement
@@ -82,21 +82,22 @@ rule TopLevelDefine =
   | DefineTokenRuleStatement
   | DefineSemanticStatement;
 
+rule ("parse_include":"()")
+DefineIncludeStatement(path: token Literal);
+
 rule ("parse_context":"()")
 DefineContextStatement(
     _: token Keyword"context",
     (ContextType) contextType: token Literal
-) contextType;
+);
 
-rule ("parse_rule":"Rule")
+rule ("parse_rule":"()")
 DefineRuleStatement(
     _: token Keyword"rule",
     hookAttr: optional HookAttribute,
     (Rule) ruleName: token Identifier,
     body: RuleDefineBody
-) {
-    hookAttr, ruleName, body
-};
+);
 
 rule ("parse_hook":"Hook")
 HookAttribute(
@@ -105,102 +106,65 @@ HookAttribute(
     _: token Symbol":",
     (HookType) hookType: token Literal,
     _: token Symbol")"
-) {
-    hookName, hookType
-};
+);
 
 rule ("parse_rule_value":"RuleValue")
-RuleDefineBody = 
-  UnionRuleBody | 
-  FunctionalRuleBody;
+RuleDefineBody = UnionRuleBody | FunctionalRuleBody;
 
 rule UnionRuleBody(
     _: token Symbol"=",
-    rules: optional UnionRuleList
-) rules;
+    (Rule) first: optional token Identifier,
+    rest: optional UnionRuleListTail+
+);
 
-rule UnionRuleList((Rule) first: token Identifier, rest: optional UnionRuleListTail) first | rest;
 rule UnionRuleListTail(
     _: token Symbol"|",
-    (Rule) first: token Identifier,
-    rest: optional UnionRuleListTail
-) first | rest;
-
+    (Rule) r: token Identifier
+);
 
 rule FunctionalRuleBody(
     _: token Symbol"(",
-    params: optional ParamList,
-    _: token Symbol")",
-    body: optional Expression
-) {
-    params, body
-};
+    firstParam: optional Parameter,
+    restParams: optional ParamListTail+,
+    _: token Symbol")"
+);
 
-
-rule ("parse_param_list":"Vec<Param>") ParamList(first: Parameter, rest: optional ParamListTail) first | rest;
-rule ParamListTail(_: token Symbol",", first: Parameter, rest: optional ParamListTail) first | rest;
+rule ParamListTail(_: token Symbol",", p: Parameter);
 
 rule ("parse_param":"Param") Parameter(
     semAttr: optional ParamSemantic,
     (Variable) variable: token Identifier,
     _: token Symbol":",
     type: optional RuleType
-) {
-    semAttr, variable, type
-};
+);
 
 rule ParamSemantic(
     _: token Symbol"(",
     (Semantic) semanticName: optional token Identifier,
     _: token Symbol")"
-) semanticName; 
+);
 
 rule RuleType(
     kwOptional: optional token Keyword"optional",
     kwToken: optional token Keyword"token",
     id: token Identifier,
-    tokenContent: optional token Literal
-) {
-    kwOptional, kwToken, id, tokenContent
-};
+    tokenContent: optional token Literal,
+    isList: optional token Symbol"+"
+);
 
-rule ("parse_token_def":"TokenDef") DefineTokenTypeStatement(
+rule ("parse_token_def":"()") DefineTokenTypeStatement(
     kwExtract: optional token Keyword"extract",
     _: token Keyword"token",
     (Token) tokenType: token Identifier
-) {
-    kwExtract, tokenType
-};
+);
 
-rule ("parse_token_ignore_rule":"TokenRule")
-DefineIgnoreTokenRuleStatement(_: token Keyword"ignore", value: LiteralOrRegExp) value;
+rule ("parse_token_ignore_rule":"()")
+DefineIgnoreTokenRuleStatement(_: token Keyword"ignore", value: LiteralOrRegExp);
 
-rule ("parse_token_rule":"TokenRule") DefineTokenRuleStatement((Token) tokenType: token Identifier, value: LiteralOrRegExp) {
-    tokenType, value
-};
+rule ("parse_token_rule":"()") DefineTokenRuleStatement((Token) tokenType: token Identifier, value: LiteralOrRegExp);
 
 rule LiteralOrRegExp = TokenLiteral | TokenRegExp;
-rule TokenLiteral(t: token Literal) t;
-rule TokenRegExp(t: token RegExp) t;
+rule TokenLiteral(t: token Literal);
+rule TokenRegExp(t: token RegExp);
 
-rule ("parse_semantic":"String") DefineSemanticStatement(_: token Keyword"semantic", (Semantic) id: token Identifier) id;
-
-rule ("parse_expr":"Expr") Expression = ConcatExpression | DictExpression;
-
-rule ConcatExpression(
-    (Variable) first: token Identifier,
-    rest: optional ConcatExpressionTail
-) first | rest;
-rule ConcatExpressionTail(
-    _: token Symbol"|",
-    rest: ConcatExpression
-) rest;
-
-rule DictExpression(
-    _: token Symbol"{",
-    values: optional VariableList,
-    _: token Symbol"}"
-) values;
-
-rule VariableList((Variable) first: token Identifier, rest: optional VariableListTail) first | rest;
-rule VariableListTail(_: token Symbol",", rest: optional VariableList) rest;
+rule ("parse_semantic":"()") DefineSemanticStatement(_: token Keyword"semantic", (Semantic) id: token Identifier);

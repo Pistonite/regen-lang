@@ -1,23 +1,31 @@
 [package]
 name = "regen-lang"
-version = "0.0.2"
+version = "0.0.4"
 edition = "2021"
-description = "TODO description.."
-repository = "https://github.com/iTNTPiston/regen-lang"
+description = "A language for defining languages"
+repository = "https://github.com/Pistonite/regen-lang"
 license = "GPL-3.0-or-later"
-authors = ["iTNTPiston <terrabyte100k@gmail.com>"]
+authors = ["Pistonite <terrabyte100k@gmail.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "^4.2.1", features = ["derive", "cargo"] }
+clap = { version = "^4.2.1", features = ["derive", "cargo"], optional = true }
 regex = "^1.7.3"
 html-escape = "^0.2.13"
 heck = "^0.4.1"
+codize = "^0.1.2"
+
+[features]
+build-binary = ["clap"]
 
 [[bin]]
 name = "regen"
 path = "src/main.rs"
+required-features = ["build-binary"]
+
+[[example]]
+name = "pt_html"
 
 [lib]
 name = "regen"

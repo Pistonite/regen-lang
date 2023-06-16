@@ -1,4 +1,6 @@
-use crate::sdk::grammar::{pt, Ctx};
+//! Core logic for parser hooks
+use crate::core::ExtractFromLiteral;
+use crate::grammar::{pt, Ctx};
 
 /// Definition of a Parser Hook
 ///
@@ -21,13 +23,11 @@ use crate::sdk::grammar::{pt, Ctx};
 ///
 /// The hooks are implemented as extern functions. The exact implementation depends on the target language.
 /// The inputs are:
-/// - The AST node that is being processed
 /// - The PT node that is being processed
-/// - The semantic information (i.e. the syntax highlighter)
-/// - The list of errors
+/// - The context object, which contains semantic information, errors, and optionally a custom context
 ///
-/// The hook will take ownership of the PT node, and return the custom object in the place of it.
-#[derive(Debug)]
+/// The hook will wrap the PT node with a custom object returned by the hook
+#[derive(Debug, Clone)]
 pub struct Hook {
   /// Function name
   pub name: String,
@@ -37,7 +37,7 @@ pub struct Hook {
 
 pub fn parse_hook(pt: &pt::HookAttribute, _: &mut Ctx) -> Option<Hook> {
   Some(Hook {
-    name: super::strip_quotes(&pt.m_hook_name),
-    return_type: super::strip_quotes(&pt.m_hook_type),
+    name: pt.m_hook_name.strip_quotes(),
+    return_type: pt.m_hook_type.strip_quotes(),
   })
 }

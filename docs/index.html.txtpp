@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A language that defines a language">
+  <meta property="og:site_name" content="pistonite.org">
+  <meta property="og:title" content="Regen">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://regen.pistonite.org">
+  <meta property="og:image" content="https://regen.pistonite.org/icon.svg">
+  <meta property="og:description" content="A language that defines a language">
+  <title>Regen Language</title>
+  <!-- The example converts regen token types to prismjs theme-->
+  <link rel="stylesheet" href="https://prismjs.com/themes/prism-okaidia.css">
+</head>
+<body>
+<!-- TXTPP#tag REGEN_FULL_SEMANTIC
+-TXTPP# -->
+<!-- TXTPP#run cargo run --example pt_html
+-TXTPP# -->
+
+<div><pre class="language-regen">REGEN_FULL_SEMANTIC</pre></div>
+</body>
+</html>

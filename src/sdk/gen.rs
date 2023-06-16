@@ -1,90 +1,95 @@
 /// Macro that implements the language SDK.
+///
 /// This is used in the generated code to avoid code duplication.
 /// It also creates convenience macros for tree parsing.
 #[macro_export]
 macro_rules! sdk {
   (
-    $regen:ident;
     context: $context:ty;
     target: $target:ident;
     tokens: [ $( $token_type:ident ),* , ];
-    regex: [ $( $token_regex:ident = $token_regex_literal:literal ),* , ];
-    rules: [ $( [ $( $token_rule:tt ),* ] ),* , ];
+    rules: [ $( $token_rule:expr ),* , ];
     semantics: [ $( $sem_type:ident ),* , ];
   ) => {
-    use $regen::sdk::{
+    use $crate::sdk::{
       ParseHook,
+      TokenType,
       TokenImpl,
       TokenStream,
-      TokenizerAction,
-      Semantic,
-      SemInfoImpl,
+      TokenBlocks,
       RootParser,
       EnvImpl,
       ContextImpl,
+      Regex,
+      AsKebabCase,
+      lex
     };
-    use std::collections::VecDeque;
-    use regex::Regex;
-    // Type aliases
-    pub type SemInfo = SemInfoImpl<Sem>;
-    pub type Token = TokenImpl<Tok>;
-    pub type Env = EnvImpl<Tok, Sem, ast::$target, $context>;
-    pub type Ctx = ContextImpl<$context, Sem>;
+    use $crate::{optional, required, list};
 
-    /// Token type enum
+    // Type aliases
+    /// GENERATED Token type alias
+    ///
+    /// See [`TokenImpl`] for more details.
+    pub type Token = TokenImpl<Tok>;
+    /// GENERATED Env type alias
+    ///
+    /// See [`EnvImpl`] for more details.
+    pub type Env = EnvImpl<Tok, ast::$target, $context>;
+    /// GENERATED Context type alias
+    ///
+    /// See [`ContextImpl`] for more details.
+    pub type Ctx = ContextImpl<$context, Tok>;
+
+    /// GENERATED Token type enum
     #[derive(Debug, Clone)]
     pub enum Tok {
       /// Internal token type used to mark unrecognized tokens
       Unknown,
-      $( $token_type ),*
-    }
-    /// Semantic type enum
-    #[derive(Debug, Clone)]
-    pub enum Sem {
-      /// Built-in semantic type that corresponds to a token
-      Token(Tok),
-      /// Semantic type with extra tags.
-      /// The tags are strings and can be used when converting to html classes
-      Tag(String, Box<Sem>),
-      $( $sem_type ),*
+      /// Semantic type with extra decorators (tags)
+      /// The tags are dynamic strings that can be used to add extra information to the token,
+      /// such as `unused` or `deprecated`.
+      Decor{
+        tag: String,
+        base:Box<Tok>},
+      $( $token_type, )*
+
+
+      $( $sem_type, )*
     }
     // Trait implementations
-    impl Semantic for Sem{
-      type T = Tok;
-      fn to_html_class(&self) -> String {
-        match self {
-          Sem::Token(token_type) => format!("token {:?}", token_type),
-          Sem::Tag(tag, underlying) => format!("{tag} {}", underlying.to_html_class()),
-          _ => format!("semantic token {:?}", self),
-        }
+    impl TokenType for Tok {
+      fn html_class(&self) -> Option<String> {
+        Some(match self {
+          Tok::Unknown => "token unknown".to_string(),
+          Tok::Decor{tag, base} => format!("{tag}{}", base.html_class().map(|s| format!(" {}", s)).unwrap_or_default()),
+          $( Tok::$token_type => format!("token {}",AsKebabCase(stringify!($token_type))) ,)*
+          $( Tok::$sem_type => format!("semantic token {}",AsKebabCase(stringify!($sem_type))) ),*
+        })
       }
     }
 
-    impl From<Tok> for Sem {
-      fn from(token_type: Tok) -> Self {
-        Sem::Token(token_type)
-      }
-    }
-
+    /// GENERATED RootParser implementation
     impl RootParser for Env {
       type T = Tok;
-      type S = Sem;
       type C = $context;
       type A = ast::$target;
       type P<'p> = pt::$target<'p>;
 
-      fn do_tokenize(src: &str, si: &mut SemInfo) -> Vec<Token>{
-        let (tokens, extract_tokens, unrec_tokens) = tokenize_internal(src);
-        si.insert_all(&tokens);
-        si.insert_all(&extract_tokens);
-        si.insert_all(&unrec_tokens);
+      fn do_tokenize(src: &str, ctx: &mut Ctx) -> Vec<Token>{
+        let rules = vec![
+          $( $token_rule ),*
+        ];
+        let (tokens, extract_tokens, unrec_tokens) = lex::run_tokenizer(src, Tok::Unknown, &rules);
+        ctx.tbs.insert_all(&tokens);
+        ctx.tbs.insert_all(&extract_tokens);
+        ctx.tbs.insert_all(&unrec_tokens);
         tokens
       }
 
-      fn parse_ast_root(ts: &mut TokenStream<Self::T>, si: &mut SemInfo) -> Option<Self::A>{
+      fn parse_ast_root(ts: &mut TokenStream<Self::T>, ctx: &mut Ctx) -> Option<Self::A>{
         let ast = ast::$target::parse(ts);
         if let Some(ast) = &ast {
-          ast.apply_semantic(si, &None);
+          ast.apply_semantic(&mut ctx.tbs, &None);
         }
         ast
       }
@@ -92,42 +97,6 @@ macro_rules! sdk {
       fn parse_pt_root<'a>(ast: &'a Self::A, ctx: &mut Ctx) -> Self::P<'a> {
         pt::$target::from_ast(ast, ctx)
       }
-    }
-
-    macro_rules! move_pt_vec {
-      ( $pt:ident ) => {
-        {
-          let pt = *$pt;
-          (pt.asts, pt.vals)
-        }
-      };
-    }
-    macro_rules! move_pt_vec_optional {
-      ( $pt:ident ) => {
-        match *$pt {
-          Some(pt) => (pt.asts, pt.vals),
-          None => (VecDeque::new(), VecDeque::new()),
-        }
-      };
-    }
-
-    /// Convinience macro for parsing an optional parameter in a functional derivation
-    macro_rules! optional {
-      ( $ts:ident, $inner:expr ) => {
-        // save the pos to restore in case of failure
-        if !$ts.push() {
-          None
-        } else {
-          let ast = $inner;
-          if ast.is_none() {
-            // restore if failure
-            $ts.restore();
-          }
-          // remove the saved pos
-          $ts.pop();
-          ast
-        }
-      };
     }
 
     /// Convinience macro for parsing a token in a functional derivation
@@ -139,10 +108,7 @@ macro_rules! sdk {
               Tok::$param_type_name => true,
               _ => false,
             }
-          }).cloned().or_else(|| {
-            $ts.set_error(false);
-            None
-          })
+          }).cloned()
         }
       };
       ($param_type_name:ident :: $lit:literal ( $ts:ident ) ) => {
@@ -155,120 +121,8 @@ macro_rules! sdk {
             }
             false
           }).cloned()
-          .or_else(|| {
-            $ts.set_error(false);
-            None
-          })
         }
       };
-    }
-
-    /// Macro that defines a tokenizer rule. This is used inside the tokenizer function
-    ///
-    /// A tokenizer rule matches a literal or a regex pattern at the start of the input.
-    /// Then it sets `$current_len` and `$action` accordingly.
-    /// The rule will only be applied if the length of the matched string is greater than `$current_len`.
-    macro_rules! tokenizer_rule {
-      // Literal match rule
-      ($current_len:ident, $action:ident, $rest:ident, $index:ident, $should_extract:expr, $match_token_type:ident, $literal:literal, $len:expr,) => {
-        if $len > $current_len && $rest.starts_with($literal) {
-          $action = TokenizerAction::Keep($should_extract, Token {
-            token_type: Tok :: $match_token_type,
-            value: $literal.to_owned(),
-            pos: ( $index, $index + $len ),
-          });
-          $current_len = $len;
-        }
-      };
-      // Regex match rule
-      // Note that regexes are precompiled before the loop, so an identity is used
-      ($current_len:ident, $action:ident, $rest:ident, $index:ident, $should_extract:expr, $match_token_type:ident, $re:ident,) => {
-        if let Some(m) = $re.find($rest) {
-          let m_str = m.as_str();
-          let len = m_str.len();
-          if len > $current_len {
-            $action = TokenizerAction::Keep($should_extract, Token {
-              token_type: Tok :: $match_token_type,
-              value: m_str.to_owned(),
-              pos: ( $index, $index + len ),
-            });
-            $current_len = len;
-          }
-        }
-      };
-      // Literal ignore rule
-      ($current_len:ident, $action:ident, $rest:ident, $index:ident, $literal:literal, $len:expr,) => {
-        if $len > $current_len && $rest.starts_with($literal) {
-          $action = TokenizerAction::Ignore;
-          $current_len = $len;
-        }
-      };
-      // Regex ignore rule
-      ($current_len:ident, $action:ident, $rest:ident, $index:ident, $re:ident,) => {
-        if let Some(m) = $re.find($rest) {
-          let len = m.end();
-          if len > $current_len {
-            $action = TokenizerAction::Ignore;
-            $current_len = len;
-          }
-        }
-      };
-    }
-
-    /// The tokenizer function
-    fn tokenize_internal(input: &str) -> (Vec<Token>, Vec<Token>, Vec<Token>) {
-      // Compile regex rules
-      $(
-        let $token_regex = Regex::new($token_regex_literal).unwrap();
-      )*
-      let mut tokens = Vec::new();
-      let mut extracted_tokens = Vec::new();
-      let mut unrecognized_tokens = Vec::new();
-      let mut index = 0;
-      while index < input.len() {
-        // Get the current slice
-        let rest = &input[index..];
-        let mut action = TokenizerAction::Panic;
-        let mut current_len = 0;
-        // Run rules
-        $(
-          tokenizer_rule!(
-            current_len,
-            action,
-            rest,
-            index,
-            $(
-              $token_rule,
-            )*
-          );
-        )*
-        // Process action
-        match action {
-          TokenizerAction::Panic => {
-            // Unrecognized token, skip one character
-            unrecognized_tokens.push(Token {
-              token_type: Tok::Unknown,
-              value: rest[0..1].to_owned(),
-              pos: (index, index+1),
-            });
-            index+=1;
-          },
-          TokenizerAction::Keep(should_extract, token) => {
-            // Recognized token
-            if should_extract {
-              extracted_tokens.push(token);
-            } else {
-              tokens.push(token);
-            }
-            index += current_len;
-          },
-          TokenizerAction::Ignore => {
-            // Ignore token
-            index += current_len;
-          }
-        }
-      }
-      (tokens, extracted_tokens, unrecognized_tokens)
     }
   };
 }
@@ -280,6 +134,7 @@ macro_rules! impl_union {
       $from_ast:ident,  $type_name:ident,
       { $( $derivation_type_name:ident, )* }
   ) => {
+    /// GENERATED AST Union Rule Implementation
     impl ast::$type_name {
       fn parse(ts: & mut TokenStream<Tok>) -> Option<Self> {
         if !ts.push() { return None; };
@@ -288,13 +143,12 @@ macro_rules! impl_union {
             ts.pop();
             return Some(Self::$derivation_type_name(Box::new(r)))
           }
-          ts.set_error(false);
           ts.restore();
         )*
         ts.pop();
         return None;
       }
-      fn apply_semantic(&self, si: &mut SemInfo, ovr: &Option<Sem>) {
+      fn apply_semantic(&self, si: &mut TokenBlocks<Tok>, ovr: &Option<Tok>) {
         match self {
           $( Self::$derivation_type_name(r) => r.apply_semantic(si, ovr), )*
         }

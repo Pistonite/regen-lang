@@ -1,5 +1,7 @@
-use super::TokenImpl;
+use crate::sdk::{token::TokenType, TokenImpl};
 use std::fmt::Write;
+
+/// TODO doc needed
 #[derive(Debug)]
 pub struct ParseHook<H, P> {
   pub pt: P,
@@ -12,6 +14,131 @@ impl<H, P> ParseHook<H, P> {
   }
 }
 
+/// Struct that represents result of [`merge_list_tail`] and [`merge_list_tail_optional_first`] macro
+pub struct MergedListTail<A, P> {
+  /// If the first member is present.
+  ///
+  /// This will always be true from [`merge_list_tail`] macro.
+  pub has_first: bool,
+  /// The merged list of values.
+  pub vals: Vec<P>,
+  /// The merged list of ast node references.
+  pub asts: Vec<A>,
+}
+
+impl<A, P> IntoIterator for MergedListTail<A, P> {
+  type Item = (A, P);
+  type IntoIter = std::iter::Zip<std::vec::IntoIter<A>, std::vec::IntoIter<P>>;
+
+  /// Convert into a parallel iterator of ast node references and values.
+  fn into_iter(self) -> Self::IntoIter {
+    self.asts.into_iter().zip(self.vals.into_iter())
+  }
+}
+
+/// Util macro to merge `first` and `rest` in a parse tree.
+///
+/// The language definition syntax sometimes forces a list to be defined as a first element and a tail.
+/// This macro makes it easier to parse such lists.
+///
+/// See [`MergedListTail`] for more details of the merged result.
+///
+/// # Example
+/// ```nocompile
+/// // Example definition of a list of numbers separated with "+" sign
+/// // rule NumberList(first: token Number, rest: optional NumberListTail+);
+/// // rule NumberListTail(_: token Symbol"+", n: token Number);
+///
+/// let pt = /* instance of the generated parse tree */;
+/// The processor function takes a &String, which is the type of `token Number` in the parse tree
+/// let merged = merge_list_tail!(pt, m_first, m_rest, m_n);
+#[macro_export]
+macro_rules! merge_list_tail {
+  ($pt:ident, $first:ident, $rest:ident, $rest_member:ident) => {{
+    let mut vals = vec![$pt.$first.as_ref()];
+    let mut asts = vec![&$pt.ast.$first];
+    for x in &mut $pt.$rest {
+      vals.push(x.$rest_member.as_ref());
+      asts.push(&x.ast.$rest_member);
+    }
+    $crate::sdk::MergedListTail {
+      has_first: true,
+      vals,
+      asts,
+    }
+  }};
+  (mut $pt:ident, $first:ident, $rest:ident, $rest_member:ident) => {{
+    let mut vals = vec![$pt.$first.as_mut()];
+    let mut asts = vec![&$pt.ast.$first];
+    for x in &mut $pt.$rest {
+      vals.push(x.$rest_member.as_mut());
+      asts.push(&x.ast.$rest_member);
+    }
+    $crate::sdk::MergedListTail {
+      has_first: true,
+      vals,
+      asts,
+    }
+  }};
+}
+
+/// Util macro to merge `first` and `rest` in a parse tree.
+///
+/// Like [`merge_list_tail`], but the first member is optional.
+///
+/// # Example
+/// ```nocompile
+/// // Example definition of a list of numbers separated with "+" sign
+/// // rule NumberList(first: optional token Number, rest: optional NumberListTail+);
+/// // rule NumberListTail(_: token Symbol"+", n: token Number);
+///
+/// let pt = /* instance of the generated parse tree */;
+/// The processor function takes a &String, which is the type of `token Number` in the parse tree
+/// let merged = merge_list_tail_optional_first!(pt, m_first, m_rest, m_n, |x: &String| x.parse::<i32>());
+/// ```
+#[macro_export]
+macro_rules! merge_list_tail_optional_first {
+  ($pt:ident, $first:ident, $rest:ident, $rest_member:ident) => {{
+    let (has_first, mut vals, mut asts) = match &$pt.$first {
+      Some(x) => (
+        true,
+        vec![x.as_ref()],
+        vec![$pt.ast.$first.as_ref().unwrap()],
+      ),
+      None => (false, vec![], vec![]),
+    };
+    for x in &$pt.$rest {
+      vals.push(x.$rest_member.as_ref());
+      asts.push(&x.ast.$rest_member);
+    }
+    $crate::sdk::MergedListTail {
+      has_first,
+      vals,
+      asts,
+    }
+  }};
+  (mut $pt:ident, $first:ident, $rest:ident, $rest_member:ident) => {{
+    let (has_first, mut vals, mut asts) = match &mut $pt.$first {
+      Some(x) => (
+        true,
+        vec![x.as_mut()],
+        vec![$pt.ast.$first.as_ref().unwrap()],
+      ),
+      None => (false, vec![], vec![]),
+    };
+    for x in &mut $pt.$rest {
+      vals.push(x.$rest_member.as_mut());
+      asts.push(&x.ast.$rest_member);
+    }
+    $crate::sdk::MergedListTail {
+      has_first,
+      vals,
+      asts,
+    }
+  }};
+}
+
+/// TODO doc needed
 #[derive(Debug, Clone)]
 pub struct Error {
   pub msg: String,
@@ -28,7 +155,10 @@ impl Error {
     }
   }
 
-  pub fn from_token<T>(token: &TokenImpl<T>, msg: String, help: String) -> Self {
+  pub fn from_token<T>(token: &TokenImpl<T>, msg: String, help: String) -> Self
+  where
+    T: TokenType,
+  {
     Self {
       msg,
       help: Some(help),
@@ -36,7 +166,10 @@ impl Error {
     }
   }
 
-  pub fn from_token_without_help<T>(token: &TokenImpl<T>, msg: String) -> Self {
+  pub fn from_token_without_help<T>(token: &TokenImpl<T>, msg: String) -> Self
+  where
+    T: TokenType,
+  {
     Self {
       msg,
       help: None,

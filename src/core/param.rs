@@ -1,5 +1,8 @@
-use super::rule::ParamType;
-use crate::sdk::grammar::{pt, Ctx, Sem};
+//! Core logic for parameters
+use std::fmt::Display;
+
+use crate::core::ExtractFromLiteral;
+use crate::grammar::{pt, Ctx, Tok};
 use crate::sdk::Error;
 
 /// Parameter of a rule derivation.
@@ -18,94 +21,38 @@ use crate::sdk::Error;
 /// - A token type Bar (e.g. param: token Bar)
 /// - A token type that also requires the content to match (e.g. param token Keyword "if")
 ///
-/// A parameter can also be optional (e.g. param: optional Foo).
-/// In total, this gives 6 different types of parameters.
+/// A parameter can also be optional (e.g. param: optional Foo) or a list (e.g. param: Foo+), or both.
+/// An optional list can be empty while a required list needs to have at least 1 element.
+///
 /// The generated Parse Tree (PT) will have different object types depending on the parameter type.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Param {
   /// Semantic type of the parameter.
   pub semantic: Option<String>,
   /// Name of the parameter.
   pub name: String,
-  /// Type of the parameter (either rule type of token type)
+  /// Type name of the parameter (either rule type of token type)
   pub type_name: String,
-  /// Is this parameter a token?
-  pub is_token: bool,
-  /// Is this parameter optional?
-  pub is_optional: bool,
-  /// If the parameter is a token, if it requires exact literal match (for example, Keyword"if")
-  pub match_literal: Option<String>,
+  /// Internal type representation of the parameter
+  pub param_type: ParamType,
 }
 
 impl Param {
   /// Get if the parameter is in the Parse Tree (PT)
-  /// A parameter is excluded from the PT if it is a required token with a literal matching
+  /// A parameter is excluded from the PT if it is a single, required token with a literal matching
   #[inline]
   pub fn is_in_pt(&self) -> bool {
-    !(self.is_token && !self.is_optional && self.match_literal.is_some())
+    !matches!(self.param_type.data, ParamDataType::Flag(_))
+      || !matches!(self.param_type.decor, ParamDecorType::None)
   }
-
-  pub fn get_type(&self) -> Option<ParamType> {
-    if self.is_token {
-      if self.match_literal.is_some() {
-        if self.is_optional {
-          // optional token Type "spec"
-          Some(ParamType::Bool)
-        } else {
-          // ignore (not in pt)
-          None
-        }
-      } else {
-        // optional? token Type
-        Some(ParamType::String(self.is_optional))
-      }
-    } else {
-      // optional? Type
-      Some(ParamType::Item(self.is_optional, self.type_name.clone()))
-    }
-  }
-}
-
-/// Parser hook for param list
-/// Removes invalid param and checks if there is duplicate param names
-pub fn parse_param_list(pt: &mut pt::ParamList, ctx: &mut Ctx) -> Option<Vec<Param>> {
-  // There aren't going to be many params, so it's fine to use not use a hash set for deduplication
-  let mut params = Vec::new();
-  for param in pt.vals.iter_mut() {
-    // Make sure param is valid before taking it out
-    let param_val = match param.val.as_ref() {
-      None => {
-        continue;
-      }
-      Some(_) => param.take_unchecked(),
-    };
-    // If param won't be in PT, it's fine to have duplicate names
-    if !param_val.is_in_pt() {
-      // Still need to add it so we can give better error message when validation function bodies.
-      params.push(param_val);
-      continue;
-    }
-
-    let name = &param_val.name;
-    if params.iter().any(|p| &p.name == name) {
-      let msg = format!("Duplicate parameter name: \"{}\"", name);
-      let help = "Rename the parameter or remove the duplicate.".to_string();
-      ctx
-        .err
-        .push(Error::from_token(&param.pt.ast.m_variable, msg, help));
-      // Don't add duplicate params
-    } else {
-      params.push(param_val);
-    }
-  }
-  Some(params)
 }
 
 /// Parser hook for param
+///
 /// Checks if type is defined and if semantic is valid
 pub fn parse_param(pt: &pt::Parameter, ctx: &mut Ctx) -> Option<Param> {
   // Validate parameter type is defined
-  let param_type = pt.m_type.as_ref().as_ref().or_else(|| {
+  let param_type = pt.m_type.as_ref().or_else(|| {
     let msg = "Missing parameter type".to_owned();
     let help = "Add a type after \":\"".to_owned();
     ctx.err.push(Error::from_token(&pt.ast.m_2, msg, help));
@@ -136,31 +83,111 @@ pub fn parse_param(pt: &pt::Parameter, ctx: &mut Ctx) -> Option<Param> {
   if let Some(ast) = pt.ast.m_type.as_ref() {
     if is_token {
       // Token type
-      ctx.si.set(&ast.m_id, Sem::SToken);
+      ctx.tbs.set(&ast.m_id, Tok::SToken);
     } else {
       // Rule type
-      ctx.si.set(&ast.m_id, Sem::SRule);
+      ctx.tbs.set(&ast.m_id, Tok::SRule);
     }
   }
+
+  let param_t = ParamType {
+    decor: if param_type.m_is_list {
+      ParamDecorType::Vec(param_type.m_kw_optional)
+    } else if param_type.m_kw_optional {
+      ParamDecorType::Optional
+    } else {
+      ParamDecorType::None
+    },
+    data: if is_token {
+      match &param_type.m_token_content {
+        None => ParamDataType::String,
+        Some(content) => ParamDataType::Flag(content.strip_quotes()),
+      }
+    } else {
+      ParamDataType::Rule
+    },
+  };
 
   let param = Param {
     semantic: semantic.cloned(),
     name: pt.m_variable.clone(),
     type_name: param_type.m_id.clone(),
-    is_token,
-    is_optional: param_type.m_kw_optional,
-    match_literal: param_type
-      .m_token_content
-      .as_ref()
-      .map(|x| super::strip_quotes(x)),
+    param_type: param_t,
+    // is_token,
+    // is_optional: param_type.m_kw_optional,
+    // match_literal: param_type
+    //   .m_token_content
+    //   .as_ref()
+    //   .map(|x| x.strip_quotes()),
+    // is_list: param_type.m_is_list,
   };
 
   if !param.is_in_pt() {
-    ctx.si.set(
+    ctx.tbs.set(
       &pt.ast.m_variable,
-      Sem::Tag("unused".to_owned(), Box::new(Sem::SVariable)),
+      Tok::Decor {
+        tag: "unused".to_owned(),
+        base: Box::new(Tok::SVariable),
+      },
     );
   }
 
   Some(param)
+}
+
+/// The parameter type.
+///
+/// This is parsed from the type definition in the language as follows. `TYPE` refer to any identifier:
+///
+/// |Type|Data|Decoration|Parse Tree Type (Rust)|
+/// |-|-|-|-|
+/// |`TYPE`|`Rule`|`None`|`TYPE`|
+/// |`optional TYPE`|`Rule`|`Optional`|`Option<TYPE>`|
+/// |`TYPE+`|`Rule`|`Vec(false)`|`Vec<TYPE>`|
+/// |`optional TYPE+`|`Rule`|`Vec(true)`|`Vec<TYPE>`|
+/// |`token TYPE`|`String`|`None`|`String`
+/// |`optional token TYPE`|`String`|`Optional`|`Option<String>`|
+/// |`token TYPE+`|`String`|`Vec(false)`|`Vec<String>`|
+/// |`optional token TYPE+`|`String`|`Vec(true)`|`Vec<String>`|
+/// |`token TYPE"literal"`|`Flag`|`None`|N/A|
+/// |`optional token TYPE"literal"`|`Flag`|`Optional`|`bool`|
+/// |`token TYPE"literal"+`|`Flag`|`Vec(false)`|`usize`|
+/// |`optional token TYPE"literal"+`|`Flag`|`Vec(true)`|`usize`|
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParamType {
+  pub decor: ParamDecorType,
+  pub data: ParamDataType,
+}
+
+/// The decoration type of a parameter
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParamDecorType {
+  None,
+  /// The parameter is optional
+  Optional,
+  /// The parameter is a list (defined with `+`)
+  ///
+  /// Optional and required lists both use this type.
+  Vec(bool /* optional */),
+}
+
+/// The data type of a parameter
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParamDataType {
+  /// The parameter type is another rule
+  Rule,
+  /// The parameter type is a token without literal match
+  String,
+  /// The parameter type is a token with literal match
+  Flag(String /* match_literal */),
+}
+
+impl Display for ParamDataType {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      ParamDataType::Rule => write!(f, "rule"),
+      ParamDataType::String => write!(f, "string"),
+      ParamDataType::Flag(literal) => write!(f, "flag<{literal}>"),
+    }
+  }
 }
