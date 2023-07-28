@@ -10,89 +10,88 @@ use crate::sdk::{TokenImpl, TokenType};
 ///
 pub struct TokenStream<'t, T>
 where
-  T: TokenType,
+    T: TokenType,
 {
-  /// Token data
-  tokens: &'t [TokenImpl<T>],
-  /// Current token index
-  index: usize,
-  /// Position stack
-  stack: Vec<usize>,
-  /// Max stack size
-  max_stack_size: usize,
-  /// Best guess at which token is causing a syntax error
-  best_error_guess: usize,
+    /// Token data
+    tokens: &'t [TokenImpl<T>],
+    /// Current token index
+    index: usize,
+    /// Position stack
+    stack: Vec<usize>,
+    /// Max stack size
+    max_stack_size: usize,
+    /// Best guess at which token is causing a syntax error
+    best_error_guess: usize,
 }
 
 impl<'t, T> TokenStream<'t, T>
 where
-  T: TokenType,
+    T: TokenType,
 {
-  /// Create a new TokenStream with the given tokens
-  pub fn new(tokens: &'t [TokenImpl<T>], max_stack_size: usize) -> Self {
-    Self {
-      tokens,
-      index: 0,
-      stack: Vec::new(),
-      max_stack_size,
-      best_error_guess: 0,
+    /// Create a new TokenStream with the given tokens
+    pub fn new(tokens: &'t [TokenImpl<T>], max_stack_size: usize) -> Self {
+        Self {
+            tokens,
+            index: 0,
+            stack: Vec::new(),
+            max_stack_size,
+            best_error_guess: 0,
+        }
     }
-  }
 
-  /// Returns if there is no token left after the current position
-  #[inline]
-  pub fn is_exhausted(&self) -> bool {
-    self.index >= self.tokens.len()
-  }
-
-  /// Get the best guess at which token is causing a syntax error
-  pub fn get_guess_err_token(&self) -> Option<&'t TokenImpl<T>> {
-    self
-      .tokens
-      .get(self.best_error_guess)
-      .or(self.tokens.get(self.index))
-  }
-
-  /// Set the error guess at the current index
-  pub fn set_error(&mut self, force: bool) {
-    if force || self.index > self.best_error_guess {
-      self.best_error_guess = self.index;
+    /// Returns if there is no token left after the current position
+    #[inline]
+    pub fn is_exhausted(&self) -> bool {
+        self.index >= self.tokens.len()
     }
-  }
 
-  /// Returns the next token if available, and advance the position
-  /// A reference is returned to avoid copying the token
-  pub fn consume(&mut self) -> Option<&'t TokenImpl<T>> {
-    match self.tokens.get(self.index) {
-      Some(token) => {
-        self.index += 1;
-        Some(token)
-      }
-      None => None,
+    /// Get the best guess at which token is causing a syntax error
+    pub fn get_guess_err_token(&self) -> Option<&'t TokenImpl<T>> {
+        self.tokens
+            .get(self.best_error_guess)
+            .or(self.tokens.get(self.index))
     }
-  }
 
-  /// Push the current position to stack so it can be restored
-  pub fn push(&mut self) -> bool {
-    if self.stack.len() >= self.max_stack_size {
-      return false;
+    /// Set the error guess at the current index
+    pub fn set_error(&mut self, force: bool) {
+        if force || self.index > self.best_error_guess {
+            self.best_error_guess = self.index;
+        }
     }
-    self.stack.push(self.index);
-    true
-  }
 
-  /// Pop position stack without restoring the position
-  #[inline]
-  pub fn pop(&mut self) {
-    self.stack.pop();
-  }
+    /// Returns the next token if available, and advance the position
+    /// A reference is returned to avoid copying the token
+    pub fn consume(&mut self) -> Option<&'t TokenImpl<T>> {
+        match self.tokens.get(self.index) {
+            Some(token) => {
+                self.index += 1;
+                Some(token)
+            }
+            None => None,
+        }
+    }
 
-  /// Restore the position to be the index on the stack top.
-  /// This does not pop the stack.
-  #[inline]
-  pub fn restore(&mut self) {
-    self.index = *self.stack.last().unwrap();
-  }
+    /// Push the current position to stack so it can be restored
+    pub fn push(&mut self) -> bool {
+        if self.stack.len() >= self.max_stack_size {
+            return false;
+        }
+        self.stack.push(self.index);
+        true
+    }
+
+    /// Pop position stack without restoring the position
+    #[inline]
+    pub fn pop(&mut self) {
+        self.stack.pop();
+    }
+
+    /// Restore the position to be the index on the stack top.
+    /// This does not pop the stack.
+    #[inline]
+    pub fn restore(&mut self) {
+        self.index = *self.stack.last().unwrap();
+    }
 }
 
 /// Helper for parsing an optional parameter using a TokenStream
@@ -103,21 +102,21 @@ where
 /// See source code for [`crate::grammar`] for examples.
 #[macro_export]
 macro_rules! optional {
-  ( $ts:ident, $inner_optional:expr ) => {
-    // save the pos to restore in case of failure
-    if !$ts.push() {
-      None
-    } else {
-      let inner = $inner_optional;
-      if inner.is_none() {
-        // restore if failure
-        $ts.restore();
-      }
-      // remove the saved pos
-      $ts.pop();
-      inner
-    }
-  };
+    ( $ts:ident, $inner_optional:expr ) => {
+        // save the pos to restore in case of failure
+        if !$ts.push() {
+            None
+        } else {
+            let inner = $inner_optional;
+            if inner.is_none() {
+                // restore if failure
+                $ts.restore();
+            }
+            // remove the saved pos
+            $ts.pop();
+            inner
+        }
+    };
 }
 
 /// Helper for parsing a required parameter using a TokenStream
@@ -130,13 +129,13 @@ macro_rules! optional {
 /// to make the early return more obvious.
 #[macro_export]
 macro_rules! required {
-  ( $ts:ident, $inner_required:expr ) => {{
-    let inner = $inner_required;
-    if inner.is_none() {
-      $ts.set_error(false);
-    }
-    inner
-  }};
+    ( $ts:ident, $inner_required:expr ) => {{
+        let inner = $inner_required;
+        if inner.is_none() {
+            $ts.set_error(false);
+        }
+        inner
+    }};
 }
 
 /// helper for parsing a list of parameters using a TokenStream
@@ -154,24 +153,24 @@ macro_rules! required {
 /// ```
 #[macro_export]
 macro_rules! list {
-  ( $ts:ident, $list:ident, $inner:expr ) => {{
-    loop {
-      if !$ts.push() {
-        break;
-      }
-      match $inner {
-        Some(item) => {
-          $list.push(item);
-          $ts.pop();
+    ( $ts:ident, $list:ident, $inner:expr ) => {{
+        loop {
+            if !$ts.push() {
+                break;
+            }
+            match $inner {
+                Some(item) => {
+                    $list.push(item);
+                    $ts.pop();
+                }
+                None => {
+                    // restore if failure
+                    $ts.restore();
+                    $ts.pop();
+                    break;
+                }
+            }
         }
-        None => {
-          // restore if failure
-          $ts.restore();
-          $ts.pop();
-          break;
-        }
-      }
-    }
-    $list
-  }};
+        $list
+    }};
 }

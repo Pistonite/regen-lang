@@ -29,15 +29,15 @@ use crate::grammar::{pt, Ctx};
 /// The hook will wrap the PT node with a custom object returned by the hook
 #[derive(Debug, Clone)]
 pub struct Hook {
-  /// Function name
-  pub name: String,
-  /// Return type
-  pub return_type: String,
+    /// Function name
+    pub name: String,
+    /// Return type
+    pub return_type: String,
 }
 
 pub fn parse_hook(pt: &pt::HookAttribute, _: &mut Ctx) -> Option<Hook> {
-  Some(Hook {
-    name: pt.m_hook_name.strip_quotes(),
-    return_type: pt.m_hook_type.strip_quotes(),
-  })
+    Some(Hook {
+        name: pt.m_hook_name.strip_quotes(),
+        return_type: pt.m_hook_type.strip_quotes(),
+    })
 }
