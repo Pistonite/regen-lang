@@ -98,23 +98,32 @@ where
     }
 }
 
+/// Output of the tokenizer
+pub struct TokenizerOutput<T> where T: TokenType {
+    /// Recognized tokens
+    pub tokens: Vec<TokenImpl<T>>,
+    /// Extracted tokens
+    ///
+    /// These are not used in AST generation, such as comments
+    pub extracted: Vec<TokenImpl<T>>,
+    /// Unrecognized tokens
+    ///
+    /// These have type `unknown`
+    pub unrecognized: Vec<TokenImpl<T>>,
+}
+
 /// Run the tokenizer based on the rules
-///
-/// This returns 3 lists of tokens:
-/// - Recognized tokens
-/// - Extracted tokens
-/// - Unrecognized tokens, which are a list of tokens with type `unknown_token`
 pub fn run_tokenizer<T>(
     input: &str,
     unknown_token: T,
     rules: &[Rule<T>],
-) -> (Vec<TokenImpl<T>>, Vec<TokenImpl<T>>, Vec<TokenImpl<T>>)
+) -> TokenizerOutput<T>
 where
     T: TokenType,
 {
     let mut tokens = Vec::new();
-    let mut extracted_tokens = Vec::new();
-    let mut unrecognized_tokens = Vec::new();
+    let mut extracted = Vec::new();
+    let mut unrecognized = Vec::new();
     let mut index = 0;
     while index < input.len() {
         // Get the current slice
@@ -132,7 +141,7 @@ where
         match current_action {
             Action::Panic => {
                 // Unrecognized token, skip one character
-                unrecognized_tokens.push(TokenImpl {
+                unrecognized.push(TokenImpl {
                     token_type: unknown_token.clone(),
                     value: rest[0..1].to_owned(),
                     pos: (index, index + 1),
@@ -143,7 +152,7 @@ where
                 tokens.push(token);
             }
             Action::Extract(token) => {
-                extracted_tokens.push(token);
+                extracted.push(token);
             }
             Action::Ignore => {
                 // Ignore token
@@ -151,5 +160,9 @@ where
         }
         index += current_len;
     }
-    (tokens, extracted_tokens, unrecognized_tokens)
+    TokenizerOutput {
+        tokens,
+        extracted,
+        unrecognized,
+    }
 }

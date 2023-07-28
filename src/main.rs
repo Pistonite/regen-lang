@@ -1,9 +1,9 @@
 use clap::{Parser, ValueEnum};
 use regen::core::build_language;
-use regen::dynamic::DynEnv;
+// use regen::dynamic::DynEnv;
 use regen::emit::{self, Emitter};
-use regen::grammar::Env;
-use regen::sdk::{Environment, Error, Mode};
+use regen::grammar;
+use regen::sdk::{Error, ASTParser, PTParser};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -124,7 +124,13 @@ fn execute() -> Result<(Vec<Error>, String), Box<dyn std::error::Error>> {
             // Read source grammar
             let grammar_source = fs::read_to_string(grammar)?;
             // Parse the language from the grammar
-            let mut env = Env::new_default(&grammar_source, Mode::All, STACK_SIZE);
+            let mut ctx = grammar::Ctx::default();    
+            let asts = grammar::Parser::parse_ast_all(&grammar_source, &mut ctx, STACK_SIZE);
+            let pts = asts.iter().map(|ast| ast.parse(&mut ctx)).collect::<Vec<_>>();
+
+            // check for errors in the context
+
+
             let result = match env.parse_pts_then(build_language) {
                 Err(_) => (env.ctx.err, grammar_source),
                 Ok(lang) => {

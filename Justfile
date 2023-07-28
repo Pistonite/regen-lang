@@ -1,5 +1,4 @@
-todo:
-    grep "TODO" . -r --exclude-dir=target --exclude-dir=.git
+set windows-powershell:=true
 
 lint:
     cargo fmt

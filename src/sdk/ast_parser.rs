@@ -1,8 +1,6 @@
-use crate::sdk::{Error, TokenBlocks, TokenStream, TokenType};
+use super::{TokenType, TokenStream, Error};
 
-/// The main trait for using the generated language
-///
-/// ASTParser provides methods for parsing the language from source code to:
+/// ASTParser provides methods for parsing the language from token stream to:
 /// 1. List of tokens
 /// 2. Abstract Syntax Tree (AST) (either one or until the token stream is exhausted)
 ///
@@ -72,49 +70,4 @@ pub trait ASTParser {
             Err((asts, errors))
         }
     }
-}
-
-/// Trait used for converting AST to Parse Tree
-///
-/// This trait is implemented by the root of the generated AST. Use this to generate a Parse Tree
-/// from the AST
-pub trait CreateParseTree {
-    type T: TokenType;
-    type C;
-    type P<'p> where Self: 'p;
-    /// Create parse tree
-    ///
-    /// Creates a Parse Tree root from the AST reference. Note that Parse Tree nodes contain references
-    /// to the AST, so the AST must be kept in memory until the Parse Tree is dropped.
-    fn parse_pt<'a>(&'a self, ctx: &mut ParseTreeContext<Self::C, Self::T>) -> Self::P<'a>;
-}
-
-/// Trait used for converting AST to Parse Tree
-///
-/// This trait is implemented by the root of the generated AST. Use this to generate a Parse Tree
-/// from the AST
-pub trait CreateParseTree {
-    type T: TokenType;
-    type C;
-    type P<'p> where Self: 'p;
-    /// Create parse tree
-    ///
-    /// Creates a Parse Tree root from the AST reference. Note that Parse Tree nodes contain references
-    /// to the AST, so the AST must be kept in memory until the Parse Tree is dropped.
-    fn parse_pt<'a>(&'a self, ctx: &mut ParseTreeContext<Self::C, Self::T>) -> Self::P<'a>;
-}
-
-#[derive(Default)]
-pub struct ParseTreeContext<C, T>
-where
-    T: TokenType,
-{
-    /// The semantic information stored as token blocks
-    pub tbs: TokenBlocks<T>,
-    /// The errors encountered during parsing
-    pub err: Vec<Error>,
-    /// The application-specific context object.
-    ///
-    /// For Regen, this is [`crate::core::Language`].
-    pub val: Box<C>,
 }

@@ -17,12 +17,11 @@ heck = "^0.4.1"
 codize = "^0.1.2"
 
 [features]
-build-binary = ["clap"]
+default = ["clap"]
 
 [[bin]]
 name = "regen"
 path = "src/main.rs"
-required-features = ["build-binary"]
 
 [[example]]
 name = "pt_html"
