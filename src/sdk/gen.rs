@@ -1,3 +1,5 @@
+//! Module with macros to implement the generated language environment.
+
 /// Macro that implements the language SDK.
 ///
 /// This is used in the generated code to avoid code duplication.
@@ -27,14 +29,12 @@ macro_rules! sdk {
     use $crate::{optional, required, list};
 
     // Type aliases
+
     /// GENERATED Token type alias
     ///
     /// See [`TokenImpl`] for more details.
     pub type Token = TokenImpl<Tok>;
-    // /// GENERATED Env type alias
-    // ///
-    // /// See [`EnvImpl`] for more details.
-    // pub type Env = EnvImpl<Tok, ast::$target, $context>;
+
     /// GENERATED Context type alias
     ///
     /// See [`ContextImpl`] for more details.
@@ -54,10 +54,11 @@ macro_rules! sdk {
             base:Box<Tok>},
         $( $token_type, )*
 
-
         $( $sem_type, )*
     }
+
     // Trait implementations
+
     impl TokenType for Tok {
         fn html_class(&self) -> Option<String> {
             Some(match self {
@@ -143,12 +144,12 @@ macro_rules! impl_union {
         fn parse(ts: & mut TokenStream<Tok>) -> Option<Self> {
             if !ts.push() { return None; };
             $(
-            if let Some(r) = ast::$derivation_type_name::parse(ts) {
-                ts.pop();
-                return Some(Self::$derivation_type_name(Box::new(r)))
-            }
-                ts.restore();
-        )*
+                if let Some(r) = ast::$derivation_type_name::parse(ts) {
+                    ts.pop();
+                    return Some(Self::$derivation_type_name(Box::new(r)))
+                }
+                    ts.restore();
+            )*
             ts.pop();
             return None;
         }
@@ -164,8 +165,8 @@ macro_rules! impl_union {
                 $(
                     ast::$type_name::$derivation_type_name(ast) => {
                         return Self::$derivation_type_name(Box::new(pt::$derivation_type_name::from_ast(ast, ctx)));
-                    }
-            )*
+                        }
+                )*
             }
         }
     }
