@@ -5,7 +5,7 @@ use crate::core::{Language, Rule, TokenDef, TokenRule};
 ///
 pub trait Emitter {
     /// Emit the SDK for the language into a [`String`].
-    fn emit(mut self, lang: &Language) -> Result<String, Box<dyn std::error::Error>>
+    fn emit(mut self, lang: &Language) -> Result<String, EmitterError>
     where
         Self: Sized,
     {
@@ -33,28 +33,23 @@ pub trait Emitter {
         self.done(lang)
     }
 
-    fn start(&mut self, lang: &Language) -> Result<(), Box<dyn std::error::Error>>;
-    fn emit_include(
-        &mut self,
-        lang: &Language,
-        path: &str,
-    ) -> Result<(), Box<dyn std::error::Error>>;
-    fn emit_token(
-        &mut self,
-        lang: &Language,
-        token: &TokenDef,
-    ) -> Result<(), Box<dyn std::error::Error>>;
-    fn emit_token_rule(
-        &mut self,
-        lang: &Language,
-        rule: &TokenRule,
-    ) -> Result<(), Box<dyn std::error::Error>>;
-    fn emit_semantic(
-        &mut self,
-        lang: &Language,
-        semantic: &str,
-    ) -> Result<(), Box<dyn std::error::Error>>;
-    fn emit_rule(&mut self, lang: &Language, rule: &Rule)
-        -> Result<(), Box<dyn std::error::Error>>;
-    fn done(self, lang: &Language) -> Result<String, Box<dyn std::error::Error>>;
+    fn start(&mut self, lang: &Language) -> Result<(), EmitterError>;
+    fn emit_include(&mut self, lang: &Language, path: &str) -> Result<(), EmitterError>;
+    fn emit_token(&mut self, lang: &Language, token: &TokenDef) -> Result<(), EmitterError>;
+    fn emit_token_rule(&mut self, lang: &Language, rule: &TokenRule) -> Result<(), EmitterError>;
+    fn emit_semantic(&mut self, lang: &Language, semantic: &str) -> Result<(), EmitterError>;
+    fn emit_rule(&mut self, lang: &Language, rule: &Rule) -> Result<(), EmitterError>;
+    fn done(self, lang: &Language) -> Result<String, EmitterError>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EmitterError {
+    #[error("Format error")]
+    Fmt(#[from] std::fmt::Error),
+    #[error("Io error")]
+    Io(#[from] std::io::Error),
+    #[error("Unknown error")]
+    Other(#[from] Box<dyn std::error::Error>),
+    #[error("Unknown error")]
+    Unknown,
 }

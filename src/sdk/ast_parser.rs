@@ -1,4 +1,4 @@
-use super::{TokenType, TokenStream, Error};
+use super::{Error, TokenStream, TokenType};
 
 /// ASTParser provides methods for parsing the language from token stream to:
 /// 1. List of tokens
@@ -28,7 +28,7 @@ pub trait ASTParser {
     ///
     /// On success, it returns a vector of ASTs. If there's any error, it returns an `Err` variant
     /// with the ASTs that have been succesfully parsed, along with the errors.
-    fn parse_ast_all(&self, ts: &mut TokenStream<Self::T>) -> Result<Vec<Self::A>, (Vec<Self::A>, Vec<Error>)> {
+    fn parse_ast_all(&self, ts: &mut TokenStream<Self::T>) -> ASTResult<Self::A> {
         let mut last_failed = false;
         let mut asts = vec![];
         let mut errors = vec![];
@@ -71,3 +71,5 @@ pub trait ASTParser {
         }
     }
 }
+
+pub type ASTResult<A> = Result<Vec<A>, (Vec<A>, Vec<Error>)>;

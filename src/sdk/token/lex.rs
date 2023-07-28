@@ -3,6 +3,8 @@
 use crate::sdk::{TokenImpl, TokenType};
 use regex::Regex;
 
+use super::TokenBlocks;
+
 /// Action the tokenizer can take at each step
 pub enum Action<T>
 where
@@ -99,7 +101,10 @@ where
 }
 
 /// Output of the tokenizer
-pub struct TokenizerOutput<T> where T: TokenType {
+pub struct TokenizerOutput<T>
+where
+    T: TokenType,
+{
     /// Recognized tokens
     pub tokens: Vec<TokenImpl<T>>,
     /// Extracted tokens
@@ -112,12 +117,20 @@ pub struct TokenizerOutput<T> where T: TokenType {
     pub unrecognized: Vec<TokenImpl<T>>,
 }
 
+impl<T> TokenizerOutput<T>
+where
+    T: TokenType,
+{
+    /// Add semantic info from the tokenizer to the [`TokenBlocks`]
+    pub fn apply_semantic(&self, tbs: &mut TokenBlocks<T>) {
+        tbs.insert_all(&self.tokens);
+        tbs.insert_all(&self.extracted);
+        tbs.insert_all(&self.unrecognized);
+    }
+}
+
 /// Run the tokenizer based on the rules
-pub fn run_tokenizer<T>(
-    input: &str,
-    unknown_token: T,
-    rules: &[Rule<T>],
-) -> TokenizerOutput<T>
+pub fn run_tokenizer<T>(input: &str, unknown_token: T, rules: &[Rule<T>]) -> TokenizerOutput<T>
 where
     T: TokenType,
 {

@@ -128,14 +128,14 @@ impl LangBuilder {
     /// Build the language
     ///
     /// This will take out the current stored definitions and return a [`Language`].
-    pub fn build(&mut self) -> Result<Language, Vec<Error>> {
+    pub fn build(&mut self, pt: &[pt::TopLevelStatement]) -> Result<Language, Vec<Error>> {
         if self.rules.is_empty() {
             return Err(vec![Error::global(
                 "No rule defined.".to_owned(),
                 "Define a rule with the \"rule\" keyword.".to_owned(),
             )]);
         }
-        Ok(Language {
+        let lang = Language {
             context: self.context.take(),
             target: self.target.take().unwrap(),
             tokens: std::mem::take(&mut self.tokens),
@@ -143,13 +143,9 @@ impl LangBuilder {
             semantics: std::mem::take(&mut self.semantics),
             rules: std::mem::take(&mut self.rules),
             includes: std::mem::take(&mut self.includes),
-        })
-    }
-}
+        };
 
-pub fn build_language(
-    pt: Vec<pt::TopLevelStatement>,
-    ctx: &mut LangBuilder,
-) -> Result<Language, Vec<Error>> {
-    validate::validate_references(&pt, ctx.build()?)
+        // Validate the language
+        validate::validate_references(pt, lang)
+    }
 }

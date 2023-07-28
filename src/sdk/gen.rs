@@ -84,16 +84,16 @@ macro_rules! sdk {
         type C = $context;
         type P<'p> = pt::$target<'p>;
 
-        fn parse_pt<'a>(&'a self, ctx: &mut Ctx) -> Self::P<'a> {
+        fn parse_pt_with_context_internal<'a>(
+            &'a self,
+            ctx: &mut Ctx
+        ) -> Self::P<'a> {
             pt::$target::from_ast(self, ctx)
         }
     }
 
-
-
     pub struct Parser;
 
-    /// GENERATED RootParser implementation
     impl ASTParser for Parser {
         type T = Tok;
         type A = ast::$target;

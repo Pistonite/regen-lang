@@ -1,7 +1,7 @@
+use super::{DynTok, DynToken};
 use crate::core::{Language, ParamDataType, ParamDecorType, RuleValue};
-use crate::sdk::{TokenStream, TokenBlocks};
+use crate::sdk::{TokenBlocks, TokenStream};
 use crate::{list, optional, required};
-use super::{DynToken, DynTok};
 
 /// Dynamic AST node
 pub enum DynAstNode {
@@ -46,7 +46,11 @@ impl DynAstNode {
     /// Parse a rule from the token stream.
     ///
     /// `rule_name` is the name of the rule to parse
-    pub fn parse_rule(ts: &mut TokenStream<DynTok>, lang: &Language, rule_name: &str) -> Option<Self> {
+    pub fn parse_rule(
+        ts: &mut TokenStream<DynTok>,
+        lang: &Language,
+        rule_name: &str,
+    ) -> Option<Self> {
         let rule = lang.rules.get(rule_name).unwrap();
         match &rule.value {
             RuleValue::Union(rules) => {
@@ -122,7 +126,12 @@ impl DynAstNode {
     }
 
     /// Apply semantic to the AST node based on the language
-    pub fn apply_semantic(&self, lang: &Language, tbs: &mut TokenBlocks<DynTok>, ovr: &Option<DynTok>) {
+    pub fn apply_semantic(
+        &self,
+        lang: &Language,
+        tbs: &mut TokenBlocks<DynTok>,
+        ovr: &Option<DynTok>,
+    ) {
         match self {
             DynAstNode::Exterior(token) => {
                 if let Some(ovr) = ovr {

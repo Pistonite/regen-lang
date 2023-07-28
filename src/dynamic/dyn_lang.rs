@@ -4,11 +4,11 @@ use std::collections::HashSet;
 
 use regex::Regex;
 
-use crate::sdk::{ASTParser, TokenStream};
+use crate::core::{Language, TokenRule};
 use crate::sdk::lex::{self, TokenizerOutput};
-use crate::core::{Language, RuleValue, TokenRule};
+use crate::sdk::{ASTParser, TokenStream};
 
-use super::{DynTok, DynAstNode};
+use super::{DynAstNode, DynTok};
 
 impl Language {
     /// Dynamically tokenize a source code string based on this language
@@ -71,6 +71,6 @@ impl ASTParser for Language {
     type A = DynAstNode;
 
     fn parse_ast(&self, ts: &mut TokenStream<Self::T>) -> Option<Self::A> {
-        DynAstNode::parse_rule(ts, &self, &self.target)
+        DynAstNode::parse_rule(ts, self, &self.target)
     }
 }

@@ -15,6 +15,7 @@ regex = "^1.7.3"
 html-escape = "^0.2.13"
 heck = "^0.4.1"
 codize = "^0.1.2"
+thiserror = "1.0.44"
 
 [features]
 default = ["clap"]

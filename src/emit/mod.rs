@@ -4,16 +4,20 @@
 //! or target language environment in Rust, TypeScript (TODO), Python (TODO), etc.
 
 use std::fs;
+use std::io;
 use std::path::Path;
 mod rust;
 pub use rust::RustEmitter;
 mod emitter;
-pub use emitter::Emitter;
+pub use emitter::{Emitter, EmitterError};
 
-pub fn get_include_contents(from: &Path, path: &str) -> Result<String, Box<dyn std::error::Error>> {
+pub fn get_include_contents(from: &Path, path: &str) -> io::Result<String> {
     let p = from.join(path);
     match fs::read_to_string(&p) {
         Ok(r) => Ok(r),
-        Err(e) => Err(format!("Error reading file {p}: {e}", p = p.display()).into()),
+        Err(e) => Err(io::Error::new(
+            e.kind(),
+            format!("Error reading file {p}: {e}", p = p.display(), e = e),
+        )),
     }
 }
