@@ -21,7 +21,7 @@ Regen is suitable for small application-specific grammars, such as a custom stri
 ## Installation
 Install the compiler
 ```
-cargo install regen --features build-binary
+cargo install regen-lang --features build-binary
 ```
 
 If you are generating for Rust, you also need to add the library
