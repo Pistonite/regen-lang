@@ -1,5 +1,4 @@
-todo:
-    grep "TODO" . -r --exclude-dir=target --exclude-dir=.git
+set windows-powershell:=true
 
 lint:
     cargo fmt
@@ -7,8 +6,7 @@ lint:
 
 sdk:
     cp src/grammar.rs src/grammar.rs.old
-    cargo run --features=build-binary emit regen.grammar -t rust-self -o src/grammar.rs
-
+    cargo run emit regen.grammar -t rust-self -o src/grammar.rs
 
 docs:
     txtpp docs

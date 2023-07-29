@@ -9,15 +9,19 @@ mod util;
 pub use util::*;
 mod token;
 pub use token::*;
-mod env;
-pub use env::*;
+// mod env;
+// pub use env::*;
+mod ast_parser;
 /// Module with macros to implement the generated language environment.
 pub mod gen;
+pub use ast_parser::*;
+mod parse_tree;
+pub use parse_tree::*;
 
 pub use heck::AsKebabCase;
 pub use regex::Regex;
 
-/// TODO doc needed
+/// Convenience macro for casting enum variants for AST and PT.
 #[macro_export]
 macro_rules! tree_cast {
   (($($t:tt)*) $var:expr ) => {

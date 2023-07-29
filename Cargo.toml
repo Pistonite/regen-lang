@@ -1,6 +1,6 @@
 [package]
 name = "regen-lang"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2021"
 description = "A language for defining languages"
 repository = "https://github.com/Pistonite/regen-lang"
@@ -15,14 +15,15 @@ regex = "^1.7.3"
 html-escape = "^0.2.13"
 heck = "^0.4.1"
 codize = "^0.1.2"
+thiserror = "1.0.44"
 
 [features]
-build-binary = ["clap"]
+default = ["clap"]
 
 [[bin]]
 name = "regen"
 path = "src/main.rs"
-required-features = ["build-binary"]
+required-features = ["clap"]
 
 [[example]]
 name = "pt_html"

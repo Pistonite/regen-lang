@@ -9,7 +9,7 @@ use crate::sdk::Error;
 pub mod hook;
 pub use hook::Hook;
 pub mod lang;
-pub use lang::{build_language, LangBuilder, Language};
+pub use lang::{LangBuilder, Language};
 pub mod param;
 pub use param::{Param, ParamDataType, ParamDecorType, ParamType};
 pub mod rule;

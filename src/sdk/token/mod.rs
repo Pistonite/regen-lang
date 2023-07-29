@@ -11,7 +11,7 @@ pub mod lex;
 /// Generic Token implementation
 ///
 /// A Token is anything that contains a type, a value, and a position in the input text
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct TokenImpl<T>
 where
     T: TokenType,

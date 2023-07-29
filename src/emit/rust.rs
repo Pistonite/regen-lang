@@ -11,6 +11,8 @@ use crate::core::{
 };
 use crate::emit::{get_include_contents, Emitter};
 
+use super::emitter::EmitterError;
+
 pub struct RustEmitter {
     is_self: bool,
     path: PathBuf,
@@ -160,16 +162,15 @@ impl RustEmitter {
         Some(t)
     }
 
-    fn emit_ast(&mut self, _: &Language, rule: &Rule) -> Result<(), Box<dyn std::error::Error>> {
+    fn emit_ast(&mut self, _: &Language, rule: &Rule) {
         match &rule.value {
             RuleValue::Union(subrules) => {
-                self.emit_ast_union(rule, subrules)?;
+                self.emit_ast_union(rule, subrules);
             }
             RuleValue::Function(params) => {
                 self.emit_ast_func(rule, params);
             }
         }
-        Ok(())
     }
 
     fn emit_ast_func(&mut self, rule: &Rule, params: &[Param]) {
@@ -269,7 +270,7 @@ impl RustEmitter {
             struct_body.push(code);
         }
         block!(
-            "fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {",
+            "pub fn parse(ts: &mut TokenStream<Tok>) -> Option<Self> {",
             [dynblock!("Some(Self {", struct_body, "})")],
             "}"
         )
@@ -333,17 +334,13 @@ impl RustEmitter {
             body.push(code);
         }
         dynblock!(
-            "fn apply_semantic(&self, si: &mut TokenBlocks<Tok>, _ovr: &Option<Tok>) {",
+            "pub fn apply_semantic(&self, si: &mut TokenBlocks<Tok>, _ovr: &Option<Tok>) {",
             body,
             "}"
         )
     }
 
-    fn emit_ast_union(
-        &mut self,
-        rule: &Rule,
-        subrules: &Vec<String>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn emit_ast_union(&mut self, rule: &Rule, subrules: &Vec<String>) {
         let ast_t = self.ast(&rule.name, false);
         let mut enum_block = Vec::new();
         for subrule in subrules {
@@ -355,10 +352,9 @@ impl RustEmitter {
             enum_block,
             "}"
         ));
-        Ok(())
     }
 
-    fn emit_pt(&mut self, lang: &Language, rule: &Rule) -> Result<(), Box<dyn std::error::Error>> {
+    fn emit_pt(&mut self, lang: &Language, rule: &Rule) {
         match &rule.value {
             RuleValue::Union(type_defs) => {
                 self.emit_pt_union(lang, rule, type_defs);
@@ -367,7 +363,6 @@ impl RustEmitter {
                 self.emit_pt_func(lang, rule, params);
             }
         }
-        Ok(())
     }
 
     fn emit_pt_func(&mut self, lang: &Language, rule: &Rule, params: &[Param]) {
@@ -560,17 +555,21 @@ impl RustEmitter {
 }
 
 impl Emitter for RustEmitter {
-    fn start(&mut self, lang: &Language) -> Result<(), Box<dyn std::error::Error>> {
+    fn start(&mut self, lang: &Language) -> Result<(), EmitterError> {
         for token in &lang.tokens {
             if token.is_extract {
                 self.extract_token_rules.insert(token.name.clone());
             }
         }
+        self.head_block.push(codeln!("#![allow(dead_code)]"));
+        self.head_block
+            .push(codeln!("#![cfg_attr(rustfmt, rustfmt_skip)]"));
+
         self.head_block
             .push(block!("/*", [codeln!(f "Generated with regen-lang")], "*/"));
         Ok(())
     }
-    fn emit_include(&mut self, _: &Language, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    fn emit_include(&mut self, _: &Language, path: &str) -> Result<(), EmitterError> {
         let target = if self.main_block.is_empty() {
             &mut self.head_block
         } else {
@@ -581,20 +580,12 @@ impl Emitter for RustEmitter {
         target.push(codeln!(f "//// /* {path} */"));
         Ok(())
     }
-    fn emit_token(
-        &mut self,
-        _: &Language,
-        token: &TokenDef,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn emit_token(&mut self, _: &Language, token: &TokenDef) -> Result<(), EmitterError> {
         self.token_block
             .push(codeln!(f "{},", self.token_name(&token.name)));
         Ok(())
     }
-    fn emit_token_rule(
-        &mut self,
-        _: &Language,
-        rule: &TokenRule,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn emit_token_rule(&mut self, _: &Language, rule: &TokenRule) -> Result<(), EmitterError> {
         match rule {
             TokenRule::IgnoreRegExp(regex) => {
                 let regex = self.regex_to_literal(regex);
@@ -633,24 +624,19 @@ impl Emitter for RustEmitter {
         }
         Ok(())
     }
-    fn emit_semantic(
-        &mut self,
-        _: &Language,
-        semantic: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn emit_semantic(&mut self, _: &Language, semantic: &str) -> Result<(), EmitterError> {
         self.semantic_block
             .push(codeln!(f "{},", self.semantic_name(semantic)));
         Ok(())
     }
-    fn emit_rule(
-        &mut self,
-        lang: &Language,
-        rule: &Rule,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        self.emit_ast(lang, rule)?;
-        self.emit_pt(lang, rule)
+
+    fn emit_rule(&mut self, lang: &Language, rule: &Rule) -> Result<(), EmitterError> {
+        self.emit_ast(lang, rule);
+        self.emit_pt(lang, rule);
+        Ok(())
     }
-    fn done(mut self, lang: &Language) -> Result<String, Box<dyn std::error::Error>> {
+
+    fn done(mut self, lang: &Language) -> Result<String, EmitterError> {
         let codize = Codize::indent(2);
 
         let mut output = String::new();

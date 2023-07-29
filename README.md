@@ -21,12 +21,14 @@ Regen is suitable for small application-specific grammars, such as a custom stri
 ## Installation
 Install the compiler
 ```
-cargo install regen-lang --features build-binary
+cargo install regen-lang
 ```
 
 If you are generating for Rust, you also need to add the library
 ```
 cargo add regen-lang
 ```
+
+You can use `--no-default-features` if you don't need the CLI to avoid dependency on `clap`
 
 Documentation on https://docs.rs/regen-lang.

@@ -1,11 +1,9 @@
 use clap::{Parser, ValueEnum};
-use regen::core::build_language;
-use regen::dynamic::DynEnv;
 use regen::emit::{self, Emitter};
-use regen::grammar::Env;
-use regen::sdk::{Environment, Error, Mode};
+use regen::sdk::{ASTParser, TokenBlocks, TokenStream};
 use std::collections::HashMap;
 use std::fs;
+use std::io;
 use std::path::PathBuf;
 
 /// Token stream stack size.
@@ -71,6 +69,103 @@ enum SdkTarget {
     RustSelf,
 }
 
+fn main() {
+    match main_internal() {
+        Ok(_) => {}
+        Err(MainError::Language(errors, source)) => {
+            for e in errors {
+                eprintln!("{}", &e.pretty(&source, 1).unwrap());
+            }
+            eprintln!("error: errors found when parsing the input file.");
+            std::process::exit(1);
+        }
+        Err(e) => {
+            eprintln!("error: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn main_internal() -> Result<(), MainError> {
+    match Cli::parse() {
+        Cli::Html {
+            grammar,
+            input,
+            output,
+            class,
+        } => {
+            // Read source code
+            let source = fs::read_to_string(input)?;
+            // Read source grammar
+            let grammar_source = fs::read_to_string(grammar)?;
+            let lang = match regen::parse_language_from_grammar(&grammar_source, STACK_SIZE) {
+                Err(errors) => {
+                    // if errors occur when parsing grammar, ignore the ASTs generated and return
+                    // the errors
+                    return Err(MainError::Language(errors, source));
+                }
+                Ok(lang) => lang,
+            };
+
+            // Create HTML class mapping from input
+            let mapping = class.into_iter().collect::<HashMap<_, _>>();
+            // Using the language as a dynamic parser, parse the source code
+            let dyn_lex_output = lang.dyn_tokenize(&source);
+            let mut ts = TokenStream::new(&dyn_lex_output.tokens, STACK_SIZE);
+            let asts = match lang.parse_ast_all(&mut ts) {
+                Err((_, errors)) => {
+                    // if errors occur when parsing AST, ignore the ASTs generated and return
+                    // the errors
+                    return Err(MainError::Language(errors, source));
+                }
+                Ok(asts) => asts,
+            };
+            // collect semantic info
+            let mut tbs = TokenBlocks::new(&source);
+            // add from lexer
+            dyn_lex_output.apply_semantic(&mut tbs);
+            // add from AST
+            for ast in &asts {
+                ast.apply_semantic(&lang, &mut tbs, &None);
+            }
+
+            // Generate the highlighted source code
+            let code = tbs.get_html(|token| mapping.get(&token).cloned().unwrap_or(token));
+
+            write_output(&code, output.as_ref())?;
+            Ok(())
+        }
+
+        Cli::Emit {
+            grammar,
+            target,
+            output,
+        } => {
+            let path = PathBuf::from(&grammar);
+            let parent_path = path.parent().unwrap();
+            let source = fs::read_to_string(grammar)?;
+
+            let lang = match regen::parse_language_from_grammar(&source, STACK_SIZE) {
+                Err(errors) => {
+                    // if errors occur when parsing grammar, ignore the ASTs generated and return
+                    // the errors
+                    return Err(MainError::Language(errors, source));
+                }
+                Ok(lang) => lang,
+            };
+
+            let emitter = match target {
+                SdkTarget::Rust => emit::RustEmitter::new(false, parent_path.to_path_buf()),
+                SdkTarget::RustSelf => emit::RustEmitter::new(true, parent_path.to_path_buf()),
+            };
+
+            let code = emitter.emit(&lang)?;
+            write_output(&code, output.as_ref())?;
+            Ok(())
+        }
+    }
+}
+
 /// Parse a single key-value pair
 ///
 /// https://github.com/clap-rs/clap/blob/master/examples/typed-derive.rs#L48
@@ -89,7 +184,7 @@ where
     Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
 }
 
-fn write_output(contents: &str, location: Option<&String>) -> Result<(), std::io::Error> {
+fn write_output(contents: &str, location: Option<&String>) -> io::Result<()> {
     if let Some(location) = location {
         fs::write(location, contents)
     } else {
@@ -98,81 +193,12 @@ fn write_output(contents: &str, location: Option<&String>) -> Result<(), std::io
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let (errors, source) = execute()?;
-
-    if !errors.is_empty() {
-        for e in errors {
-            eprintln!("{}", &e.pretty(&source, 1)?);
-        }
-        return Err("Errors found when parsing the input file.".into());
-    }
-
-    Ok(())
-}
-
-fn execute() -> Result<(Vec<Error>, String), Box<dyn std::error::Error>> {
-    match Cli::parse() {
-        Cli::Html {
-            grammar,
-            input,
-            output,
-            class,
-        } => {
-            // Read source code
-            let source = fs::read_to_string(input)?;
-            // Read source grammar
-            let grammar_source = fs::read_to_string(grammar)?;
-            // Parse the language from the grammar
-            let mut env = Env::new_default(&grammar_source, Mode::All, STACK_SIZE);
-            let result = match env.parse_pts_then(build_language) {
-                Err(_) => (env.ctx.err, grammar_source),
-                Ok(lang) => {
-                    // Create HTML class mapping from input
-                    let mapping = class.into_iter().collect::<HashMap<_, _>>();
-                    // Using the language as context, parse the source code with dynamic AST
-                    let mut env = DynEnv::new_ctx(&source, Mode::All, STACK_SIZE, lang);
-                    // Ignoring the generated parse trees. We only need the semantic info.
-                    let _ = env.parse_pts_then(|_, _| Ok(()));
-                    // Generate the highlighted source code
-                    let code = env
-                        .ctx
-                        .tbs
-                        .get_html(|token| mapping.get(&token).cloned().unwrap_or(token));
-
-                    if env.ctx.err.is_empty() {
-                        write_output(&code, output.as_ref())?;
-                    }
-
-                    (env.ctx.err, source)
-                }
-            };
-            Ok(result)
-        }
-        Cli::Emit {
-            grammar,
-            target,
-            output,
-        } => {
-            let path = PathBuf::from(&grammar);
-            let parent_path = path.parent().unwrap();
-            let source = fs::read_to_string(grammar)?;
-            let mut env = Env::new_ctx(&source, Mode::All, STACK_SIZE, Default::default());
-
-            let emitter = match target {
-                SdkTarget::Rust => emit::RustEmitter::new(false, parent_path.to_path_buf()),
-                SdkTarget::RustSelf => emit::RustEmitter::new(true, parent_path.to_path_buf()),
-            };
-
-            let result = match env.parse_pts_then(build_language) {
-                Err(_) => (env.ctx.err, source),
-                Ok(lang) => {
-                    let code = emitter.emit(&lang)?;
-                    write_output(&code, output.as_ref())?;
-                    (vec![], source)
-                }
-            };
-            Ok(result)
-        }
-    }
+#[derive(Debug, thiserror::Error)]
+enum MainError {
+    #[error("IO error")]
+    Io(#[from] io::Error),
+    #[error("Emitter error")]
+    Emitter(#[from] emit::EmitterError),
+    #[error("Language error")]
+    Language(Vec<regen::sdk::Error>, String),
 }
