@@ -7,7 +7,7 @@ use crate::sdk::{TokenImpl, TokenType};
 ///
 /// The token streams are used internally to generate the AST.
 /// They are not meant to be used independently.
-///
+#[derive(Debug)]
 pub struct TokenStream<'t, T>
 where
     T: TokenType,

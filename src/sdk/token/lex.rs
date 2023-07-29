@@ -6,6 +6,7 @@ use regex::Regex;
 use super::TokenBlocks;
 
 /// Action the tokenizer can take at each step
+#[derive(Debug, Clone, PartialEq)]
 pub enum Action<T>
 where
     T: TokenType,
@@ -27,6 +28,7 @@ where
 /// The target of a token rule
 ///
 /// Targets are blue prints of the tokenizer. [`Action`]s are generated from targets.
+#[derive(Debug, Clone, PartialEq)]
 pub enum Target<T>
 where
     T: TokenType,
@@ -61,6 +63,7 @@ where
     }
 }
 /// Token rule
+#[derive(Debug, Clone)]
 pub enum Rule<T>
 where
     T: TokenType,
@@ -101,6 +104,7 @@ where
 }
 
 /// Output of the tokenizer
+#[derive(PartialEq, Debug, Clone)]
 pub struct TokenizerOutput<T>
 where
     T: TokenType,

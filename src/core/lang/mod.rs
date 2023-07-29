@@ -3,7 +3,7 @@
 use crate::core::{Rule, TokenDef, TokenRule};
 use crate::grammar::pt;
 use crate::sdk::Error;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 mod validate;
 
@@ -32,7 +32,7 @@ pub struct Language {
     /// The semantic definitions
     pub semantics: Vec<String>,
     /// The rule definitions
-    pub rules: HashMap<String, Rule>,
+    pub rules: BTreeMap<String, Rule>,
     /// The files to include (relative path from the grammar file)
     pub includes: Vec<String>,
 }
@@ -48,7 +48,7 @@ pub struct LangBuilder {
     tokens: Vec<TokenDef>,
     token_rules: Vec<TokenRule>,
     semantics: Vec<String>,
-    rules: HashMap<String, Rule>,
+    rules: BTreeMap<String, Rule>,
     includes: Vec<String>,
 }
 

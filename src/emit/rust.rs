@@ -284,7 +284,7 @@ impl RustEmitter {
                     let semantic_expr = match &param.semantic {
                         Some(s) => {
                             let s = self.semantic_name(s);
-                            format!("Some(Tok::{s})")
+                            format!("&Some(Tok::{s})")
                         }
                         None => "_ovr".to_owned(),
                     };

@@ -6,6 +6,7 @@ use crate::sdk::{TokenImpl, TokenType};
 /// is that `TokenBlocks` is used for overwriting semantic type for tokens in any position, while `TokenStream`
 /// is used for consuming one token at a time. The `get_spans` and `get_html` methods can
 /// be used to get the semantic tokens.
+#[derive(PartialEq, Debug, Clone)]
 pub struct TokenBlocks<S>
 where
     S: TokenType,

@@ -41,7 +41,7 @@ macro_rules! sdk {
     pub type Ctx = ParseTreeContext<$context, Tok>;
 
     /// GENERATED Token type enum
-    #[derive(Default, Debug, Clone)]
+    #[derive(PartialEq, Default, Debug, Clone)]
     pub enum Tok {
         /// Internal token type used to mark unrecognized tokens
         #[default]
