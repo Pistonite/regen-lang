@@ -9,8 +9,6 @@ mod util;
 pub use util::*;
 mod token;
 pub use token::*;
-// mod env;
-// pub use env::*;
 mod ast_parser;
 /// Module with macros to implement the generated language environment.
 pub mod gen;

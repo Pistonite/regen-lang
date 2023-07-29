@@ -79,6 +79,7 @@ where
 }
 
 /// Struct used internally to store the context while parsing the parse tree.
+#[derive(Debug)]
 pub struct ParseTreeContext<C, T>
 where
     T: TokenType,

@@ -1,7 +1,7 @@
 use crate::sdk::{token::TokenType, TokenImpl};
 use std::fmt::Write;
 
-/// TODO doc needed
+/// A parse tree node that contains the original node, as well as the result from a parse tree hook
 #[derive(Debug)]
 pub struct ParseHook<H, P> {
     pub pt: P,
@@ -9,12 +9,17 @@ pub struct ParseHook<H, P> {
 }
 
 impl<H, P> ParseHook<H, P> {
+    /// Take the value from the parse tree hook without checking if it is present.
+    ///
+    /// This is a warpper for `val.take().unwrap_or_else(...)` that should be used
+    /// when the value is always present. If you need to check the value, use the `val` field instead
     pub fn take_unchecked(&mut self) -> H {
         self.val.take().unwrap_or_else(||panic!("ParseHook::take() called on None. Make sure your parse hook function is not taking the value twice."))
     }
 }
 
 /// Struct that represents result of [`merge_list_tail`] and [`merge_list_tail_optional_first`] macro
+#[derive(Debug)]
 pub struct MergedListTail<A, P> {
     /// If the first member is present.
     ///
@@ -138,11 +143,14 @@ macro_rules! merge_list_tail_optional_first {
     }};
 }
 
-/// TODO doc needed
-#[derive(Debug, Clone)]
+/// Error type for the parser.
+#[derive(PartialEq, Debug, Clone)]
 pub struct Error {
+    /// Error message
     pub msg: String,
+    /// Optional help message
     pub help: Option<String>,
+    /// Abosolute character position in the source file
     pub pos: (usize, usize),
 }
 
