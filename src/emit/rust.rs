@@ -575,9 +575,9 @@ impl Emitter for RustEmitter {
         } else {
             &mut self.main_block
         };
-        target.push(codeln!(f "//// /* {path} */"));
+        target.push(codeln!(f "// /* {path} */"));
         target.push(Code::Line(get_include_contents(&self.path, path)?));
-        target.push(codeln!(f "//// /* {path} */"));
+        target.push(codeln!(f "// /* {path} */"));
         Ok(())
     }
     fn emit_token(&mut self, _: &Language, token: &TokenDef) -> Result<(), EmitterError> {

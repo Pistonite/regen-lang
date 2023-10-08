@@ -37,7 +37,7 @@ impl<A, P> IntoIterator for MergedListTail<A, P> {
 
     /// Convert into a parallel iterator of ast node references and values.
     fn into_iter(self) -> Self::IntoIter {
-        self.asts.into_iter().zip(self.vals.into_iter())
+        self.asts.into_iter().zip(self.vals)
     }
 }
 
