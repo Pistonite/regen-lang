@@ -6,6 +6,7 @@ description = "A language for defining languages"
 repository = "https://github.com/Pistonite/regen-lang"
 license = "GPL-3.0-or-later"
 authors = ["Pistonite <terrabyte100k@gmail.com>"]
+exclude = ["docs/*"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
