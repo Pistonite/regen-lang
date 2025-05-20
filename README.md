@@ -1,4 +1,7 @@
 # ![](./docs/icon.svg) regen-lang
+
+Archived - using my new parser library [teleparse](https://github.com/Pistonite/teleparse)
+
 Regen is a language that defines languages. The `regen` compiler generates a parser for the language defined with the Regen language in supported general-purpose programming languages:
 - Rust
 - TypeScript (originally planned but not going to be worked on any time soon - use Rust WASM instead for now)
